@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geçmiş Kayıtlar</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+body{margin:0;font-family:"Segoe UI",sans-serif;background:#0F172A;color:#E2E8F0;}
+header{background:#0A66C2;padding:20px;text-align:center;color:white;font-size:22px;font-weight:700;}
+
+.container{max-width:1200px;margin:30px auto;padding:20px;}
+input,select{padding:10px;border-radius:10px;border:none;margin:5px;background:#1E293B;color:white;}
+table{width:100%;margin-top:20px;border-collapse:separate;border-spacing:0 8px;text-align:center;}
+th{background:#063A6B;padding:12px;border-radius:8px;color:white;}
+td{background:#1E293B;padding:10px;border-radius:8px;}
+tr td:last-child{font-weight:700;color:#38BDF8;}
+#arama{width:220px;}
+#geri{color:white;background:#DC2626;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;}
+.download{background:#0084FF;padding:10px 16px;border-radius:8px;color:white;text-decoration:none;font-weight:700;}
+</style>
+</head>
+<body>
+
+<header><i class="fa-solid fa-book"></i> Geçmiş Kayıtlar</header>
+
+<div class="container">
+
+  <!-- Filtreler -->
+  <div style="margin-bottom:15px;display:flex;flex-wrap:wrap;gap:10px;">
+    <input type="text" id="arama" placeholder="Ara (İsim / TC / Plaka)">
+	<div id="tarihKontrol" style="display:flex;align-items:center;gap:10px;font-size:20px;font-weight:bold;">
+  <button id="solGun" style="padding:5px 10px;border-radius:8px;">⬅️</button>
+  <span id="tarihLabel" style="cursor:pointer;">--.--.----</span>
+  <button id="sagGun" style="padding:5px 10px;border-radius:8px;">➡️</button>
+</div>
+
+    <button class="download" id="excelBtn"><i class="fa-solid fa-file-excel"></i> Excel</button>
+    <button class="download" id="pdfBtn"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+    <a id="geri" href="kayit.html"><i class="fa-solid fa-arrow-left"></i> Geri</a>
+  </div>
+
+  <table id="kayitTablo">
+    <thead>
+      <tr>
+        <th>Ad / Soyad</th>
+        <th>Giriş</th>
+        <th>Çıkış</th>
+        <th>Kalma Süresi</th>
+        <th>Güvenlik</th>
+        <th>Otomatik mi?</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+</div>
+
+
+<!-- FIREBASE -->
+<script type="module">
+/* ================= FIREBASE ================= */
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, onValue } 
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+/* === QR / SITE === */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if (!siteID || !siteConfigStr) {
+  alert("Site bağlantısı yok. QR tekrar okutulmalı.");
+  location.href = "index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+/* === TEK APP === */
+let app = getApps().find(a => a.name === `siteApp-${siteID}`);
+if (!app) app = initializeApp(siteConfig, `siteApp-${siteID}`);
+const db = getDatabase(app);
+
+/* ================= TARİH SİSTEMİ ================= */
+let tumKayitlar = [];
+let tumAlanlar = new Set();
+let aktifTarih = bugunTarih();
+tarihLabel.innerText = aktifTarih;
+
+function bugunTarih(){
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+}
+function tarihNesne(str){
+  const [g,a,y] = str.split(".");
+  return new Date(y,a-1,g);
+}
+function tarihMetin(dt){
+  return `${String(dt.getDate()).padStart(2,"0")}.${String(dt.getMonth()+1).padStart(2,"0")}.${dt.getFullYear()}`;
+}
+
+/* ================= TARİH KONTROLLER ================= */
+solGun.onclick = ()=>{
+  let d = tarihNesne(aktifTarih);
+  d.setDate(d.getDate()-1);
+  aktifTarih = tarihMetin(d);
+  filtrele();
+};
+sagGun.onclick = ()=>{
+  let d = tarihNesne(aktifTarih);
+  d.setDate(d.getDate()+1);
+  aktifTarih = tarihMetin(d);
+  filtrele();
+};
+tarihLabel.onclick = ()=>{
+  let sec = prompt("GG.AA.YYYY", aktifTarih);
+  if(sec && /^\d{2}\.\d{2}\.\d{4}$/.test(sec)){
+    aktifTarih = sec;
+    filtrele();
+  }
+};
+
+/* ================= FIREBASE VERİ ================= */
+onValue(ref(db,"ziyaretciler/"), snap=>{
+  tumKayitlar = [];
+  tumAlanlar = new Set();
+
+  snap.forEach(guv=>{
+    Object.values(guv.val()||{}).forEach(veri=>{
+      if(!veri.cikis) return;
+
+      let k = { ...veri, guvenlik: guv.key };
+
+      if(k.giris && k.cikis){
+        let t1 = tarihCevir(k.giris);
+        let t2 = tarihCevir(k.cikis);
+        let f = (t2 - t1)/1000;
+        k.sure = `${Math.floor(f/3600)} Saat ${Math.floor((f%3600)/60)} Dakika`;
+      }
+
+      Object.keys(k).forEach(x=>tumAlanlar.add(x));
+      tumKayitlar.push(k);
+    });
+  });
+
+  tabloyuOlustur();
+  filtrele();
+});
+
+/* ================= FİLTRE ================= */
+function filtrele(){
+  tarihLabel.innerText = aktifTarih;
+  tabloYaz(tumKayitlar.filter(k=>k.giris?.startsWith(aktifTarih)));
+}
+
+/* ================= TARİH PARSE ================= */
+function tarihCevir(str){
+  let [t,s] = str.split(" ");
+  let [sa,dk] = s.split(":");
+  if(t.includes("-")){
+    let [y,a,g]=t.split("-");
+    return new Date(y,a-1,g,sa,dk);
+  } else {
+    let [g,a,y]=t.split(".");
+    return new Date(y,a-1,g,sa,dk);
+  }
+}
+
+/* ================= TABLO ================= */
+function tabloyuOlustur(){
+  const tr = document.querySelector("#kayitTablo thead tr");
+  tr.innerHTML="";
+  let sabit=["giris","cikis","sure","guvenlik"];
+  [...tumAlanlar].filter(x=>!sabit.includes(x))
+    .forEach(x=>tr.innerHTML+=`<th>${x.toUpperCase()}</th>`);
+  tr.innerHTML+=`<th>GİRİŞ</th><th>ÇIKIŞ</th><th>SÜRE</th><th>GÜVENLİK</th>`;
+}
+
+function tabloYaz(liste){
+  const tb = document.querySelector("#kayitTablo tbody");
+  tb.innerHTML="";
+  let sabit=["giris","cikis","sure","guvenlik"];
+  let dyn=[...tumAlanlar].filter(x=>!sabit.includes(x));
+  liste.forEach(k=>{
+    let r="<tr>";
+    dyn.forEach(x=>r+=`<td>${k[x]??"-"}</td>`);
+    r+=`<td>${k.giris}</td><td>${k.cikis}</td><td>${k.sure}</td><td>${k.guvenlik}</td></tr>`;
+    tb.innerHTML+=r;
+  });
+}
+
+/* ================= ARAMA ================= */
+arama.oninput = e=>{
+  let v=e.target.value.toLowerCase();
+  tabloYaz(tumKayitlar.filter(k=>JSON.stringify(k).toLowerCase().includes(v)));
+};
+
+/* ================= EXCEL ================= */
+excelBtn.onclick=()=>{
+  let csv="Veri,Giriş,Çıkış,Süre,Güvenlik\n"+
+    tumKayitlar.map(k=>`${k.ad||""},${k.giris},${k.cikis},${k.sure},${k.guvenlik}`).join("\n");
+  let a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="gecmis_kayitlar.csv"; a.click();
+};
+
+/* ================= PDF ================= */
+pdfBtn.onclick=()=>{
+  html2pdf().from(kayitTablo).set({
+    margin:5, filename:"gecmis_kayitlar.pdf",
+    jsPDF:{orientation:"landscape"}
+  }).save();
+};
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+</body>
+</html>

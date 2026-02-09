@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modern Olay Takip Paneli</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  body {margin:0;font-family:'Montserrat', sans-serif;background:#f5f7fa;color:#2c3e50;padding:16px;}
+  h1 {text-align:center;margin-bottom:24px;font-weight:700;color:#34495e;}
+  .filters {display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:20px;}
+  .filters select, .filters input, .filters button {padding:10px 14px;border-radius:8px;border:1px solid #ccc;font-size:14px;outline:none;transition:0.2s;}
+  .filters select:focus, .filters input:focus {border-color:#3498db;box-shadow:0 0 6px rgba(52,152,219,0.3);}
+  #resetFilters {background:#3498db;color:white;border:none;}
+  #resetFilters:hover {background:#2980b9;}
+  .event-card {background:white;padding:16px;border-radius:12px;margin-bottom:16px;box-shadow:0 6px 15px rgba(0,0,0,0.08);transition:0.3s;word-wrap: break-word;}
+  .event-card:hover {box-shadow:0 8px 20px rgba(0,0,0,0.15);}
+  .event-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+  .event-user {font-weight:600;}
+  .event-type {font-weight:700;color:white;padding:4px 8px;border-radius:6px;font-size:13px;}
+  .event-type.Hirsizlik { background:#e74c3c; }
+  .event-type.Gurultu { background:#f39c12; }
+  .event-type.Yangin { background:#d35400; }
+  .event-type.Supheli-Kisi { background:#8e44ad; }
+  .event-location, .event-time, .event-desc {margin-bottom:6px;font-size:14px;display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;}
+  .event-card img {max-width:150px;border-radius:8px;margin-top:10px;cursor:pointer;transition:0.3s;}
+  .event-card img:hover {transform:scale(1.5);z-index:999;}
+  #message {text-align:center;font-weight:600;margin-top:20px;color:#7f8c8d;}
+  #modal, #deleteModal {display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);justify-content:center;align-items:center;z-index:1000;}
+  #modalContent, #deleteModalContent {background:#fff;color:#2c3e50;max-width:90%;max-height:80%;overflow:auto;word-wrap: break-word;white-space: pre-wrap;line-height:1.5;padding:20px;border-radius:12px;position:relative;}
+  #modalClose, #deleteModalClose {position:absolute;top:10px;right:15px;font-size:20px;font-weight:bold;cursor:pointer;}
+  button.pdfBtn { background:#27ae60; color:white; border:none; cursor:pointer; font-weight:600; border-radius:8px; padding:6px 12px; }
+  button.pdfBtn:hover { background:#2ecc71; }
+  button.deleteBtn { background:#e74c3c; color:white; border:none; cursor:pointer; font-weight:600; border-radius:8px; padding:6px 12px; }
+  button.deleteBtn:hover { background:#c0392b; }
+  #logoutBtn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background:#e67e22;
+    color:white;
+    border:none;
+    padding:8px 16px;
+    border-radius:8px;
+    font-weight:600;
+    cursor:pointer;
+    z-index:1001;
+    transition:0.2s;
+  }
+  #logoutBtn:hover { background:#d35400; }
+  @media(max-width:600px){.filters { flex-direction:column; align-items:center; } .filters select, .filters input, .filters button { width:90%; } .event-card img { max-width:100%; }}
+</style>
+</head>
+<body>
+
+<h1>Olay Takip Paneli</h1>
+<button id="logoutBtn">Çıkış</button>
+
+<div class="filters">
+  <select id="filterUser">
+    <option value="">Tüm Guvenlikler</option>
+  </select>
+  <select id="filterType">
+    <option value="">Tüm Türler</option>
+    <option value="Hırsızlık">Hırsızlık</option>
+    <option value="Gürültü">Gürültü</option>
+    <option value="Yangın">Yangın</option>
+    <option value="Şüpheli Kişi">Şüpheli Kişi</option>
+  </select>
+  <input type="date" id="filterStart">
+  <input type="date" id="filterEnd">
+  <button id="resetFilters">Temizle</button>
+</div>
+
+<div id="message">Yükleniyor...</div>
+<div id="eventsContainer"></div>
+
+<div id="modal">
+  <div id="modalContent">
+    <span id="modalClose">&times;</span>
+    <div id="modalText"></div>
+  </div>
+</div>
+
+<div id="deleteModal">
+  <div id="deleteModalContent">
+    <span id="deleteModalClose">&times;</span>
+    <div id="deleteText"></div>
+    <button id="confirmDeleteBtn">Evet, Sil</button>
+    <button id="cancelDeleteBtn">İptal</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+const { jsPDF } = window.jspdf;
+
+/* === QR ile gelen Firebase bilgileri (localStorage) === */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if (!siteID || !siteConfigStr) {
+  alert("Site bağlantısı yok. Lütfen QR kodu tekrar okutunuz.");
+  window.location.href = "index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+/* === Aynı siteye tekrar bağlanma kontrolü === */
+let app = getApps().find(a => a.name === `siteApp-${siteID}`);
+if (!app) {
+  app = initializeApp(siteConfig, `siteApp-${siteID}`);
+}
+
+const db = getDatabase(app);
+
+const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+if(!currentUser || (currentUser.type !== 'admin' && currentUser.type !== 'company')) { 
+  alert("Sadece admin veya company kullanıcı giriş yapabilir!"); 
+  window.location.href = "index.html";
+}
+
+const eventsContainer = document.getElementById('eventsContainer');
+const message = document.getElementById('message');
+const filterType = document.getElementById('filterType');
+const filterUser = document.getElementById('filterUser');
+const filterStart = document.getElementById('filterStart');
+const filterEnd = document.getElementById('filterEnd');
+const resetFilters = document.getElementById('resetFilters');
+const modal = document.getElementById('modal');
+const modalText = document.getElementById('modalText');
+const modalClose = document.getElementById('modalClose');
+const deleteModal = document.getElementById('deleteModal');
+const deleteModalClose = document.getElementById('deleteModalClose');
+const deleteText = document.getElementById('deleteText');
+const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
+let allEvents = [];
+let selectedEventToDelete = null;
+
+// Çıkış butonu
+logoutBtn.addEventListener('click', () => {
+    if(currentUser.type === 'company'){
+        window.location.href = "sirket.html";
+    } else {
+        window.location.href = "yetkili.html";
+    }
+});
+
+
+// Türkçe karakter düzeltme
+function fixTurkishChars(str){
+    const map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+    return str.replace(/[çÇğĞıİöÖşŞüÜ]/g, m => map[m]);
+}
+
+// PDF kaydet
+function saveEventAsPDF(event){
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    let y = 10;
+    doc.setFontSize(16);
+    doc.text(`Olay Turu: ${fixTurkishChars(event.type)}`, 10, y); y+=10;
+    doc.setFontSize(14);
+    doc.text(`Guvenlik: ${fixTurkishChars(event.user)}`, 10, y); y+=10;
+    doc.text(`Yer: ${fixTurkishChars(event.location)}`, 10, y); y+=10;
+    doc.text(`Tarih / Saat: ${event.date} ${event.time}`, 10, y); y+=10;
+    doc.setFontSize(12);
+    const lines = doc.splitTextToSize(`Aciklama: ${fixTurkishChars(event.description)}`, 180);
+    doc.text(lines, 10, y);
+    y += lines.length*7;
+
+    if(event.photoData){
+        const imgProps = doc.getImageProperties(event.photoData);
+        const pdfWidth = 180;
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        y += 10;
+        doc.addImage(event.photoData,'JPEG',10,y,pdfWidth,pdfHeight);
+    }
+
+    function sanitizeFilename(str){
+        return fixTurkishChars(str).replace(/[\/\\?%*:|"<> ]/g,'_');
+    }
+
+    doc.save(`${sanitizeFilename(event.type)}_${sanitizeFilename(event.user)}_${event.date}.pdf`);
+}
+
+// Silme modal
+function showDeleteModal(event){
+    selectedEventToDelete = event;
+    deleteText.innerText = `Bu olayi silmek istediginize emin misiniz?\n\nOlay: ${event.type} - ${event.description}`;
+    deleteModal.style.display = 'flex';
+}
+
+// Kullanıcı filtreleme seçeneklerini doldur
+function populateUserFilter(){
+    const users = [...new Set(allEvents.map(e=>e.user))];
+    filterUser.innerHTML = '<option value="">Tüm Guvenlikler</option>';
+    users.forEach(u=>{
+        const opt = document.createElement('option');
+        opt.value = u;
+        opt.textContent = u;
+        filterUser.appendChild(opt);
+    });
+}
+
+// Olayları renderle
+function renderEvents(){
+    eventsContainer.innerHTML = '';
+    let filtered = allEvents;
+
+    if(filterUser.value) filtered = filtered.filter(e => e.user === filterUser.value);
+    if(filterType.value) filtered = filtered.filter(e=>e.type===filterType.value);
+    if(filterStart.value){
+        const start = new Date(filterStart.value);
+        filtered = filtered.filter(e=>new Date(e.timestamp)>=start);
+    }
+    if(filterEnd.value){
+        const end = new Date(filterEnd.value);
+        end.setHours(23,59,59,999);
+        filtered = filtered.filter(e=>new Date(e.timestamp)<=end);
+    }
+
+    if(filtered.length===0){ message.innerText="Gosterilecek olay yok."; return; }
+    message.innerText="";
+    filtered.sort((a,b)=>b.timestamp-a.timestamp); 
+
+    filtered.forEach(olay=>{
+        const card = document.createElement('div');
+        card.className='event-card';
+        const typeClass = fixTurkishChars(olay.type).replace(/\s/g,'-');
+        card.innerHTML=`
+            <div class="event-header">
+                <span class="event-user">👮 ${olay.user}</span>
+                <span class="event-type ${typeClass}">${olay.type}</span>
+            </div>
+            <div class="event-location">📍 Yer: ${olay.location}</div>
+            <div class="event-desc">📝 Açıklama: <button class="readMoreBtn">Olayi Oku</button><span class="descText" style="display:none;">${olay.description}</span></div>
+            <div class="event-time">🕒 Tarih / Saat: ${olay.date} ${olay.time}</div>
+            ${olay.photoData ? `<img src="${olay.photoData}" alt="Fotoğraf">` : ''}
+            <div style="margin-top:10px; display:flex; gap:10px;">
+                <button class="deleteBtn">Sil</button>
+                <button class="pdfBtn">PDF Kaydet</button>
+            </div>
+        `;
+        eventsContainer.appendChild(card);
+        card.querySelector('.pdfBtn').addEventListener('click', ()=>saveEventAsPDF(olay));
+        card.querySelector('.deleteBtn').addEventListener('click', ()=>showDeleteModal(olay));
+    });
+
+    populateUserFilter();
+
+    document.querySelectorAll('.readMoreBtn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+            modalText.innerText = btn.nextElementSibling.innerText;
+            modal.style.display='flex';
+        });
+    });
+
+    document.querySelectorAll('.event-card img').forEach(img=>{
+        img.addEventListener('click', ()=>{
+            modalText.innerHTML = `<img src="${img.src}" style="max-width:100%;">`;
+            modal.style.display='flex';
+        });
+    });
+}
+
+// Modal kapatma
+modalClose.addEventListener('click', ()=> modal.style.display='none');
+modal.addEventListener('click', e=>{ if(e.target===modal) modal.style.display='none'; });
+deleteModalClose.addEventListener('click', ()=> deleteModal.style.display='none');
+cancelDeleteBtn.addEventListener('click', ()=> deleteModal.style.display='none');
+confirmDeleteBtn.addEventListener('click', ()=>{
+    if(selectedEventToDelete){
+        remove(ref(db, `securityEvents/${selectedEventToDelete.user}/${selectedEventToDelete.key}`));
+        allEvents = allEvents.filter(e=>e!==selectedEventToDelete);
+        renderEvents();
+        deleteModal.style.display='none';
+        selectedEventToDelete = null;
+    }
+});
+
+// Firebase olayları çek
+const olayRef = ref(db,'securityEvents');
+onValue(olayRef,snapshot=>{
+    allEvents=[];
+    if(snapshot.exists()){
+        const usersData = snapshot.val();
+        for(const userKey in usersData){
+            const userEvents = usersData[userKey];
+            for(const olayKey in userEvents){
+                const olay = userEvents[olayKey];
+                allEvents.push({...olay,user:userKey,key:olayKey});
+            }
+        }
+    }
+
+    // Otomatik son 7 gün (bugünden geriye 7 gün)
+    const today = new Date();
+    const endStr = today.getFullYear() + '-' 
+                 + String(today.getMonth()+1).padStart(2,'0') + '-' 
+                 + String(today.getDate()).padStart(2,'0');
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    const startStr = sevenDaysAgo.getFullYear() + '-' 
+                   + String(sevenDaysAgo.getMonth()+1).padStart(2,'0') + '-' 
+                   + String(sevenDaysAgo.getDate()).padStart(2,'0');
+
+    filterStart.value = startStr;
+    filterEnd.value = endStr;
+
+    renderEvents();
+});
+
+// Filtre eventleri
+filterUser.addEventListener('change', renderEvents);
+filterType.addEventListener('change', renderEvents);
+filterStart.addEventListener('change', renderEvents);
+filterEnd.addEventListener('change', renderEvents);
+resetFilters.addEventListener('click', ()=>{filterUser.value=''; filterType.value=''; filterStart.value=''; filterEnd.value=''; renderEvents();});
+
+</script>
+</body>
+</html>
+

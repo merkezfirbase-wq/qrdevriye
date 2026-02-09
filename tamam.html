@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamamlanan Nöbetler - Amir Paneli</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body { margin:0; font-family:'Montserrat', sans-serif; background:#ecf0f1; color:#2c3e50; }
+.container { max-width:600px; margin:20px auto; padding:10px; }
+h1 { text-align:center; margin-bottom:20px; font-weight:700; }
+
+.filters { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+.filters label { font-weight:600; font-size:14px; width:100%; }
+.filters input,
+.filters select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;       /* gri çerçeve eklendi */
+  background: #fff;             /* input alanı beyaz olacak */
+  flex: 1 1 48%;
+  transition: 0.2s;
+}
+
+/* Odaklanınca daha belirgin olsun */
+.filters input:focus,
+.filters select:focus {
+  outline: none;
+  border-color: #2980b9;        /* mavi çerçeve */
+  box-shadow: 0 0 5px rgba(41,128,185,0.5);
+}
+
+/* Butonlar için */
+.filters button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  flex: 1 1 100%;
+  background: #2980b9;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.filters button:hover { background:#3498db; }
+
+.filters button { background:#2980b9; color:#fff; font-weight:600; cursor:pointer; transition:0.3s; flex:1 1 100%; }
+.filters button:hover { background:#3498db; }
+
+.card { background:#fdfdfd; border-radius:12px; padding:12px; margin-bottom:15px; box-shadow:0 4px 12px rgba(0,0,0,0.1); position:relative; transition:0.2s; }
+.card:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,0.15); }
+
+.card-header { font-weight:600; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.card-body { display:flex; flex-direction:column; gap:5px; font-size:14px; }
+
+.card-item { margin-bottom:4px; }
+
+.info-icon { display:flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#e74c3c; color:#fff; font-weight:700; cursor:pointer; font-size:12px; }
+.tooltip { display:none; position:absolute; top:30px; right:0; background:#34495e; color:#fff; padding:6px 10px; border-radius:8px; font-size:12px; width:180px; z-index:10; }
+.info-container:hover .tooltip { display:block; }
+.info-container { position: absolute; top: -10px; right: -10px; }
+
+.duration-box {
+  position: relative; /* absolute yerine relative yaptık */
+  margin-top: 8px;   /* teslim tarihinden boşluk */
+  background: #dfe6e9;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight:600;
+  color: #2c3e50;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+#backBtn { position: fixed; bottom: 20px; left:50%; transform:translateX(-50%); width:60px; height:60px; border-radius:12px; border:none; background:#2980b9; color:#fff; font-weight:700; font-size:16px; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+#backBtn:hover { background:#3498db; }
+
+@media(max-width:480px){
+  .container{padding:10px;}
+  .filters input, .filters select, .filters button{font-size:12px; padding:8px; flex:1 1 100%;}
+  .card-body { font-size:13px; }
+  #backBtn { width:50px; height:50px; font-size:14px; }
+}
+
+#logContainer {
+  max-height: 450px; /* 5 kart görünür */
+  overflow-y: auto;  /* aşağı kaydırınca scroll çıkar */
+  padding-right: 5px; /* scrollbar için boşluk */
+}
+#logContainer::-webkit-scrollbar {
+  width: 6px;
+}
+#logContainer::-webkit-scrollbar-thumb {
+  background: #2980b9;
+  border-radius: 3px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Tamamlanan Nöbetler</h1>
+
+  <div class="filters">
+    <label for="dateFrom">Başlangıç Tarihi:</label>
+    <input type="date" id="dateFrom">
+    <label for="dateTo">Bitiş Tarihi:</label>
+    <input type="date" id="dateTo">
+
+    <label for="userFilter">Güvenlik Seç:</label>
+    <select id="userFilter">
+      <option value="">Tümü</option>
+    </select>
+
+    <button id="applyFilter">Filtrele</button>
+  </div>
+
+  <div id="logContainer"></div>
+</div>
+
+<button id="backBtn">Geri</button>
+
+<script type="module">
+import { initializeApp, getApps } from
+  "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+import {
+  getDatabase,
+  ref,
+  onValue,
+  push,
+  get,
+  remove
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+/* === QR ile gelen Firebase bilgileri === */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if (!siteID || !siteConfigStr) {
+  alert("Site bağlantısı yok. Lütfen QR kodu tekrar okutunuz.");
+  window.location.href = "index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+/* === Aynı siteye tekrar bağlanma kontrolü === */
+let app = getApps().find(a => a.name === `siteApp-${siteID}`);
+if (!app) {
+  app = initializeApp(siteConfig, `siteApp-${siteID}`);
+}
+
+const db = getDatabase(app);
+
+const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+if(!currentUser || (currentUser.type !== 'admin' && currentUser.type !== 'company')) { 
+  alert("Sadece admin veya company kullanıcı giriş yapabilir!"); 
+  window.location.href = "index.html";
+}
+
+
+const logContainer = document.getElementById('logContainer');
+const userFilter = document.getElementById('userFilter');
+const dateFrom = document.getElementById('dateFrom');
+const dateTo = document.getElementById('dateTo');
+const applyFilter = document.getElementById('applyFilter');
+const backBtn = document.getElementById('backBtn');
+
+backBtn.addEventListener('click', ()=>{
+  if(currentUser.type === 'company'){
+    window.location.href = 'sirket.html';
+  } else {
+    window.location.href = 'yetkili.html';
+  }
+});
+
+
+let logs = [];
+
+const usersRef = ref(db,'users');
+onValue(usersRef, snapshot=>{
+  userFilter.innerHTML = '<option value="">Tümü</option>';
+  const val = snapshot.val();
+  if(val){
+    Object.values(val).forEach(user=>{
+      if(user.type==='security'){
+        const opt = document.createElement('option');
+        opt.value = user.username || user.name;
+        opt.innerText = user.name || user.username;
+        userFilter.appendChild(opt);
+      }
+    });
+  }
+});
+
+const tamamnbtRef = ref(db,'tamamnbt'); 
+onValue(tamamnbtRef, snapshot=>{
+  const val = snapshot.val();
+  logs = val ? Object.values(val) : [];
+  renderLogs(logs);
+});
+
+async function addRecord(newRecord) {
+  await push(tamamnbtRef, newRecord);
+  const snapshot = await get(tamamnbtRef);
+  const records = snapshot.val() ? Object.entries(snapshot.val()) : [];
+  if(records.length > 300){
+    const [oldestKey] = records[0];
+    await remove(ref(db, 'tamamnbt/' + oldestKey));
+  }
+}
+
+function renderLogs(data){
+  logContainer.innerHTML='';
+  data.sort((a,b)=> new Date(b.startTime) - new Date(a.startTime));
+  if(data.length === 0){
+    logContainer.innerHTML = '<p style="text-align:center;color:#777;">Gösterilecek tamamlanan nöbet yok.</p>';
+    return;
+  }
+
+  data.forEach(log=>{
+    const end = log.endTime ? new Date(log.endTime) : null;
+    const farkNokta = log.startPoint && log.endPoint && log.startPoint !== log.endPoint;
+
+    const card = document.createElement('div');
+    card.classList.add('card');
+
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    header.innerHTML = `
+      <span>${log.startBy} tarafından başlatıldı</span>
+      <span>${log.deliveredTo || 'Henüz teslim edilmedi'}’a teslim edildi</span>
+    `;
+    card.appendChild(header);
+
+    if(farkNokta){
+      const infoWrapper = document.createElement('div');
+      infoWrapper.className = 'info-container';
+
+      const infoIcon = document.createElement('div');
+      infoIcon.className = 'info-icon';
+      infoIcon.innerText = '!';
+      infoWrapper.appendChild(infoIcon);
+
+      const tooltip = document.createElement('div');
+      tooltip.className = 'tooltip';
+      tooltip.innerText = 'Nöbet alınan nokta ve teslim edilen nokta farklı.';
+      infoWrapper.appendChild(tooltip);
+
+      card.appendChild(infoWrapper);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+    const options = { dateStyle: "short", timeStyle: "short" };
+    const startStr = log.startTime ? new Date(log.startTime).toLocaleString("tr-TR", options) : 'Bilgi yok';
+    const endStr = log.endTime ? new Date(log.endTime).toLocaleString("tr-TR", options) : 'Bilgi yok';
+    body.innerHTML = `
+      <div class="card-item"><strong>Başlangıç Noktası:</strong> ${log.startPoint || 'Bilgi yok'}</div>
+      <div class="card-item"><strong>Başlangıç Tarihi:</strong> ${startStr}</div>
+      <div class="card-item"><strong>Teslim Noktası:</strong> ${log.endPoint || 'Bilgi yok'}</div>
+      <div class="card-item"><strong>Teslim Tarihi:</strong> ${endStr}</div>
+    `;
+    card.appendChild(body);
+
+    if(end){
+      const startTime = new Date(log.startTime);
+      const diffMs = end - startTime;
+      const diffHrs = Math.floor(diffMs / (1000*60*60));
+      const diffMin = Math.floor((diffMs % (1000*60*60)) / (1000*60));
+      
+      const durationDiv = document.createElement('div');
+      durationDiv.className = 'duration-box';
+      durationDiv.innerText = `🕒Nöbet Süresi:${diffHrs} Saat ${diffMin} Dakika`;
+      durationDiv.title = "Nöbet Süresi";
+      
+      card.appendChild(durationDiv);
+    }
+
+    logContainer.appendChild(card);
+  });
+}
+
+applyFilter.addEventListener('click', ()=>{
+  let filtered = logs;
+  const fromDate = dateFrom.value ? new Date(dateFrom.value) : null;
+  const toDate = dateTo.value ? new Date(dateTo.value+"T23:59:59") : null;
+  const user = userFilter.value;
+
+  if(fromDate) filtered = filtered.filter(l=> new Date(l.startTime) >= fromDate);
+  if(toDate) filtered = filtered.filter(l=> new Date(l.startTime) <= toDate);
+  if(user) filtered = filtered.filter(l=> l.startBy===user || l.deliveredTo===user);
+
+  renderLogs(filtered);
+});
+</script>
+</body>
+</html>

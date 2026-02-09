@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nöbet Takip Sistemi</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body { margin:0; font-family:'Montserrat', sans-serif; background: linear-gradient(135deg,#2c3e50,#34495e); color:#ecf0f1; display:flex; flex-direction:column; align-items:center; min-height:100vh; }
+.container { max-width:600px; width:90%; background: rgba(0,0,0,0.75); padding:25px; border-radius:16px; margin-top:30px; box-shadow:0 6px 20px rgba(0,0,0,0.5); }
+h1,h2 { text-align:center; }
+label { display:block; margin-top:12px; margin-bottom:6px; }
+select, input[type=text] { width:100%; padding:10px; border-radius:8px; border:none; font-size:14px; margin-bottom:10px; background:#fff; color:#000; }
+button { width:100%; padding:12px; border:none; border-radius:10px; margin-top:12px; font-weight:600; cursor:pointer; transition:0.3s; }
+button:hover { opacity:0.9; }
+#startBtn { background:#27ae60; color:#fff; }
+#deliverBtn { background:#c0392b; color:#fff; }
+#timer { font-size:24px; text-align:center; margin-top:20px; }
+#qrScannerModal, #successModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:9999; flex-direction:column; align-items:center; justify-content:center; padding:16px; color:#fff; border-radius:12px; }
+#qr-reader { width:100%; max-width:500px; }
+#closeScanner, #thanksBtn { margin-top:20px; padding:12px 18px; border:none; border-radius:10px; background:#c0392b; color:#fff; font-weight:700; cursor:pointer; }
+
+/* Geri Butonu */
+#backBtn {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  border: none;
+  background: #2980b9;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 10000;
+}
+#backBtn:hover { background: #3498db; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Nöbet Takip Sistemi</h1>
+
+  <div id="shiftSection">
+    <label for="shiftSelect">Vardiya</label>
+    <select id="shiftSelect">
+      <option value="Gündüz">Gündüz</option>
+      <option value="Gece">Gece</option>
+    </select>
+
+    <label for="securitySelect">Hangi güvenlikten nöbet alacaksınız?</label>
+    <select id="securitySelect"></select>
+
+    <button id="startBtn">Nöbete Başla</button>
+  </div>
+
+  <div id="deliverSection" style="display:none;">
+    <div id="timer">00:00:00</div>
+    <label for="deliverSelect">Nöbeti teslim edeceğiniz güvenlik</label>
+    <select id="deliverSelect"></select>
+    <button id="deliverBtn">Nöbeti Teslim Et</button>
+  </div>
+</div>
+
+<!-- QR Modal -->
+<div id="qrScannerModal">
+  <div id="qr-reader"></div>
+  <button id="closeScanner">Kapat</button>
+</div>
+
+<!-- Başarılı Modal -->
+<div id="successModal">
+  <h2 id="successText">İyi nöbetler.</h2>
+  <button id="thanksBtn">Teşekkür ederim</button>
+</div>
+
+<!-- Geri Butonu -->
+<button id="backBtn">Geri</button>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, onValue, push, update, get, remove } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+/* === QR ile seçilen site Firebase === */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if (!siteID || !siteConfigStr) {
+  alert("Site bağlantısı yok. Lütfen QR kodu tekrar okutunuz.");
+  window.location.href = "index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+// Aynı siteye tekrar bağlan
+let app = getApps().find(a => a.name === `siteApp-${siteID}`);
+if (!app) {
+  app = initializeApp(siteConfig, `siteApp-${siteID}`);
+}
+
+const db = getDatabase(app);
+
+
+
+// Kullanıcı
+const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+if(!currentUser || currentUser.type!=='security'){
+  alert("Güvenlik kullanıcı ile giriş yapmalısınız!");
+  window.location.href="login.html";
+}
+
+// DOM
+const securitySelect = document.getElementById('securitySelect');
+const deliverSelect = document.getElementById('deliverSelect');
+const shiftSelect = document.getElementById('shiftSelect');
+const startBtn = document.getElementById('startBtn');
+const deliverBtn = document.getElementById('deliverBtn');
+const timerEl = document.getElementById('timer');
+const qrModal = document.getElementById('qrScannerModal');
+const qrReaderDivId = 'qr-reader';
+const closeScanner = document.getElementById('closeScanner');
+const successModal = document.getElementById('successModal');
+const successText = document.getElementById('successText');
+const shiftSection = document.getElementById('shiftSection');
+const deliverSection = document.getElementById('deliverSection');
+
+let qrScanner=null, timerInterval=null, startTime=null;
+let currentShiftKey=null;
+
+// Kullanıcıları getir
+const usersRef = ref(db,'users');
+onValue(usersRef, snapshot=>{
+  const val = snapshot.val();
+  securitySelect.innerHTML=''; deliverSelect.innerHTML='';
+  if(val){
+    Object.values(val).forEach(user=>{
+      if(user.type==='security'){
+        const opt = document.createElement('option');
+        opt.value = user.username || user.name;
+        opt.innerText = user.name || user.username;
+        securitySelect.appendChild(opt);
+
+        const opt2 = document.createElement('option');
+        opt2.value = user.username || user.name;
+        opt2.innerText = user.name || user.username;
+        deliverSelect.appendChild(opt2);
+      }
+    });
+  }
+});
+
+// Sayaç
+function startTimer(savedTime){
+  startTime = savedTime ? new Date(savedTime) : new Date();
+  timerInterval = setInterval(()=>{
+    const diff = new Date() - startTime;
+    const h = String(Math.floor(diff/3600000)).padStart(2,'0');
+    const m = String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
+    const s = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+    timerEl.innerText = `${h}:${m}:${s}`;
+  },1000);
+}
+function stopTimer(){ clearInterval(timerInterval); timerEl.innerText='00:00:00'; }
+
+// Kendi başlattığın nöbeti kontrol et
+const nobetRef = ref(db,'nobetRecords');
+onValue(nobetRef, snapshot=>{
+  const val = snapshot.val();
+  if(!val) {
+    shiftSection.style.display='block';
+    deliverSection.style.display='none';
+    stopTimer();
+    currentShiftKey = null;
+    return;
+  }
+
+  const myActiveShiftEntry = Object.entries(val).find(([key, shift]) => 
+      shift.status === 'started' && shift.startBy === currentUser.username
+  );
+
+  if(myActiveShiftEntry){
+      const [key, shift] = myActiveShiftEntry;
+      currentShiftKey = key;
+      shiftSection.style.display = 'none';
+      deliverSection.style.display = 'block';
+      startTimer(shift.startTime);
+  } else {
+      currentShiftKey = null;
+      shiftSection.style.display = 'block';
+      deliverSection.style.display = 'none';
+      stopTimer();
+  }
+});
+
+// QR okuma ve validasyon
+async function validateQR(qrId){
+  const qrSnap = await get(ref(db,'qrNoktas/'+qrId));
+  return qrSnap.exists() ? qrSnap.val() : null;
+}
+
+// Başlat
+startBtn.addEventListener('click', ()=>{
+  const currentShift = shiftSelect.value;
+  const fromSecurity = securitySelect.value;
+  if(!fromSecurity){ alert("Lütfen güvenlik seçin!"); return; }
+
+  qrModal.style.display='flex';
+  if(qrScanner) qrScanner.clear();
+  qrScanner = new Html5Qrcode(qrReaderDivId);
+
+  qrScanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+    async qrCodeMessage=>{
+      qrScanner.stop();
+      qrModal.style.display='none';
+
+      const qrData = await validateQR(qrCodeMessage);
+      if(!qrData){
+        alert("Geçersiz QR kod! Nöbet başlatılamadı.");
+        return;
+      }
+
+      const record = {
+        startBy: currentUser.username || currentUser.name,
+        fromSecurity: fromSecurity,
+        startPoint: qrData.name || qrCodeMessage,
+        shift: currentShift,
+        startTime: new Date().toISOString(),
+        status:'started'
+      };
+      push(ref(db,'nobetRecords'), record);
+
+      successText.innerText="İyi nöbetler.";
+      successModal.style.display='flex';
+    },
+    err=>{}
+  ).catch(err=>{ alert("Kamera açılamadı: "+err); });
+});
+
+// Teslim et ve tamamlananlara taşı
+deliverBtn.addEventListener('click', async ()=>{
+  if(!currentShiftKey){ alert("Aktif nöbet kaydı bulunamadı!"); return; }
+
+  const deliverTo = deliverSelect.value;
+  if(!deliverTo){ alert("Teslim edilecek kişi seçin!"); return; }
+
+  qrModal.style.display='flex';
+  if(qrScanner) qrScanner.clear();
+  qrScanner = new Html5Qrcode(qrReaderDivId);
+
+  qrScanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+    async qrCodeMessage=>{
+      qrScanner.stop();
+      qrModal.style.display='none';
+
+      const qrData = await validateQR(qrCodeMessage);
+      if(!qrData){
+        alert("Geçersiz QR kod! Nöbet teslim edilemedi.");
+        return;
+      }
+
+      // Mevcut kaydı oku
+      const shiftSnap = await get(ref(db,'nobetRecords/'+currentShiftKey));
+      if(!shiftSnap.exists()){
+        alert("Aktif nöbet kaydı bulunamadı!");
+        return;
+      }
+      const shiftData = shiftSnap.val();
+
+      // Tamamlananlar alanına ekle
+      const completedRecord = {
+        ...shiftData,
+        deliveredBy: currentUser.username,
+        deliveredTo: deliverTo,
+        endPoint: qrData.name || qrCodeMessage,
+        endTime: new Date().toISOString(),
+        status: 'ended'
+      };
+      await push(ref(db,'tamamnbt'), completedRecord);
+
+      // Aktif kaydı sil
+      await remove(ref(db,'nobetRecords/'+currentShiftKey));
+
+      successText.innerText="Nöbet başarıyla teslim edildi ve tamamlandı.";
+      successModal.style.display='flex';
+  },
+  err=>{}
+  ).catch(err=>{ alert("Kamera açılamadı: "+err); });
+});
+
+// Teşekkür
+thanksBtn.addEventListener('click', ()=>{ successModal.style.display='none'; window.location.href="guvenlik.html"; });
+// QR kapatma
+closeScanner.addEventListener('click', ()=>{ if(qrScanner) qrScanner.stop(); qrModal.style.display='none'; });
+
+// Geri Butonu
+document.getElementById("backBtn").addEventListener("click", ()=>{ window.location.href = "guvenlik.html"; });
+</script>
+</body>
+</html>
+

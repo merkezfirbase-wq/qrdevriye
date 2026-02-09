@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amir Devriye Paneli</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<style>
+body { margin:0; font-family:'Roboto',sans-serif; background:#1f2a38; color:#e0e0e0; }
+.filter-card {
+  background:#222f3e;
+  padding:10px;
+  border-radius:10px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.3);
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  font-size:0.9rem;
+}
+.filter-card label { color:#ffcc00; }
+.filter-card select, .filter-card input {
+  padding:6px 10px;
+  border-radius:6px;
+  border:none;
+  background:#1a2b3a;
+  color:#fff;
+  font-size:0.85rem;
+}
+
+header { padding:15px 10px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; background:#222f3e; box-shadow:0 5px 15px rgba(0,0,0,0.3);}
+header h1 { margin:0; color:#ffcc00; font-size:1.2rem; }
+header button { padding:8px 12px; border:none; border-radius:10px; background:#e67e22; color:#fff; cursor:pointer; margin-top:5px; }
+.container { padding:10px; max-width:1200px; margin:auto; }
+.cards { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; }
+.card { flex:1; min-width:140px; background:#222f3e; padding:10px; border-radius:10px; box-shadow:0 5px 15px rgba(0,0,0,0.3); text-align:center; }
+.card h3 { margin:5px 0; font-size:0.9rem; color:#ffcc00; }
+.card p { font-size:1.2rem; margin:0; text-align:center; }
+
+#devriyeTable_wrapper { background:#1f2a38; padding:5px; border-radius:10px; overflow-x:auto; }
+table.dataTable { width:100% !important; color:#fff; }
+table.dataTable th { background:#2c3e50; color:#ffcc00; }
+table.dataTable td { background:#1a2b3a; text-align:center; font-size:0.85rem; }
+/* kalıcı satır renkleri (DataTables + hücrelere uygulanır) */
+/* Satırları kart gibi yap */
+table.dataTable {
+  border-collapse: separate !important;
+  border-spacing: 0 8px !important; /* satırlar arası boşluk */
+}
+
+table.dataTable tbody tr {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+table.dataTable tbody tr:hover {
+  transform: scale(1.01);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+/* Rozet tarzı durum */
+.status-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-complete { background: #2ecc71; color: #fff; }
+.status-partial { background: #f1c40f; color: #fff; }
+.status-excess { background: #e74c3c; color: #fff; }
+
+
+/* alternatif: satırın tamamını vurgulamak istersen (opsiyonel) */
+table.dataTable tbody tr.complete { background: rgba(46,204,113,0.06) !important; }
+table.dataTable tbody tr.partial { background: rgba(241,196,15,0.06) !important; }
+table.dataTable tbody tr.excess { background: rgba(231,76,60,0.06) !important; }
+
+
+.modal { display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; }
+.modal-content { background:#1f2a38; padding:15px; border-radius:12px; width:95%; max-width:700px; max-height:90%; overflow:auto; }
+.modal-content h3 { margin-top:0; color:#ffcc00; }
+.modal-content pre { background:#222f3e; padding:10px; border-radius:10px; overflow-x:auto; color:#fff; }
+.closeBtn { background:#c0392b; color:#fff; padding:8px 12px; border:none; border-radius:8px; cursor:pointer; margin-top:10px; width:100%; }
+
+.filters { margin-bottom:10px; display:flex; flex-wrap:wrap; gap:5px; }
+.filters label { margin-right:5px; font-size:0.85rem; }
+.filters select, .filters input { padding:5px 8px; border-radius:6px; border:none; background:#1a2b3a; color:#fff; font-size:0.85rem; }
+#loadingContainer { width:100%; background:#1a2b3a; border-radius:10px; height:20px; margin:10px 0; }
+#loadingBar { width:0%; height:100%; background:#27ae60; border-radius:10px; transition:width 0.3s; }
+#loadingText { color:#fff; font-size:0.85rem; margin:0 0 10px 0; }
+#devriyeTable th {
+  text-align: center;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Amir Devriye Paneli</h1>
+  <div style="display:flex; flex-wrap:wrap; gap:5px;">
+    <button id="logoutBtn">Çıkış</button>
+    <button id="statusBtn" style="background:#27ae60;">Durum Grafiği</button>
+  </div>
+</header>
+
+<div id="loadingContainer">
+  <div id="loadingBar"></div>
+</div>
+<p id="loadingText">Yükleniyor: 0%</p>
+
+<div class="container">
+  <div class="cards">
+    <div class="card">
+      <h3>Toplam Devriye</h3>
+      <p id="totalDevriye">0</p>
+    </div>
+    <div class="card">
+      <h3>Tamamlanan</h3>
+      <p id="completeDevriye">0</p>
+    </div>
+    <div class="card">
+      <h3>Yarım</h3>
+      <p id="partialDevriye">0</p>
+    </div>
+    <div class="card">
+      <h3>Eksik</h3>
+      <p id="excessDevriye">0</p>
+    </div>
+  </div>
+
+<div class="filters" style="flex-direction:column; gap:10px;">
+  <div class="filter-card">
+    <label for="filterUser">Güvenlik:</label>
+    <select id="filterUser"><option value="">Tümü</option></select>
+  </div>
+
+  <div class="filter-card">
+    <label for="filterStatus">Durum:</label>
+    <select id="filterStatus">
+      <option value="">Tümü</option>
+      <option value="Tam devriye">Tam devriye</option>
+      <option value="Yarım devriye">Yarım devriye</option>
+      <option value="Eksik">Eksik</option>
+    </select>
+  </div>
+
+  <div class="filter-card">
+    <label for="filterDate">Tarih:</label>
+    <input type="date" id="filterDate">
+  </div>
+</div>
+
+
+  <table id="devriyeTable" class="display">
+ <thead>
+  <tr>
+    <th>Kullanıcı</th>
+    <th>Tarih</th>
+    <th>Durum</th>
+    <th>Başlangıç</th>
+    <th>Bitiş</th>
+    <th>Puan</th>
+    <th>Detay</th>
+  </tr>
+</thead>
+
+
+    <tbody></tbody>
+  </table>
+</div>
+
+<div id="detailModal" class="modal">
+  <div class="modal-content">
+    <h3>Devriye Detayları</h3>
+    <div id="devriyeDetail"></div>
+    <button class="closeBtn" onclick="document.getElementById('detailModal').style.display='none'">Kapat</button>
+  </div>
+</div>
+
+<div id="statusModal" class="modal">
+  <div class="modal-content">
+    <h3>Güvenlik Devriye Durumları</h3>
+    <table id="statusTable" style="width:100%; border-collapse:collapse; color:#fff;">
+      <thead>
+        <tr style="background:#2c3e50;">
+          <th style="padding:8px;">Kullanıcı</th>
+          <th style="padding:8px;">Tam Devriye</th>
+          <th style="padding:8px;">Yarım Devriye</th>
+          <th style="padding:8px;">Eksik Devriye</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button class="closeBtn" onclick="document.getElementById('statusModal').style.display='none'">Kapat</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+/* ================== FIREBASE INIT ================== */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+if (!siteID || !siteConfigStr) { alert("Site bağlantısı yok"); location.href="index.html"; }
+const siteConfig = JSON.parse(siteConfigStr);
+
+let app = getApps().find(a=>a.name===`siteApp-${siteID}`);
+if(!app) app = initializeApp(siteConfig, `siteApp-${siteID}`);
+
+const db = getDatabase(app);
+
+/* ================== AUTH ================== */
+const currentUser = JSON.parse(sessionStorage.getItem("currentUser"));
+if(!currentUser || !["admin","company"].includes(currentUser.type)){
+  alert("Yetkisiz giriş"); location.href="index.html";
+}
+
+/* ================== DATATABLE ================== */
+let table = $('#devriyeTable').DataTable({
+  pageLength:20,
+  language:{
+    lengthMenu:"Göster _MENU_ kayıt",
+    zeroRecords:"Kayıt yok",
+    info:"_TOTAL_ kayıttan _START_ - _END_",
+    infoEmpty:"Gösterilecek kayıt yok",
+    search:"Ara:",
+    paginate:{next:"›",previous:"‹"}
+  }
+});
+
+let devriyeData = [];
+let usersSet = new Set();
+
+/* ================== HELPERS ================== */
+function normalizeStatus(s){
+  if(!s) return "Eksik";
+  s = s.toLowerCase();
+  if(s.includes("tam")) return "Tam devriye";
+  if(s.includes("yarım")) return "Yarım devriye";
+  return "Eksik";
+}
+
+/* ================== TÜM GÜVENLİKLER ================== */
+async function loadAllGuards(){
+  const snap = await get(ref(db,"devriyeHistory"));
+  if(!snap.exists()) return;
+
+  usersSet.clear();
+  Object.keys(snap.val()).forEach(user=>{
+    usersSet.add(user);
+  });
+
+  const sel = document.getElementById("filterUser");
+  sel.innerHTML='<option value="">Tümü</option>';
+  [...usersSet].sort().forEach(u=>{
+    const o=document.createElement("option"); o.value=o.textContent=u;
+    sel.appendChild(o);
+  });
+}
+
+/* ================== DEVRIYE YÜKLEME (OPTİMİZE) ================== */
+async function loadDevries({user=null, date=null}){
+  devriyeData=[];
+  table.clear().draw();
+
+  let snaps = [];
+
+  if(user && date){
+    // Kullanıcı + tarih → sadece o gün
+    const userSnap = await get(ref(db, `devriyeHistory/${user}`));
+    if(userSnap.exists()){
+      snaps = Object.values(userSnap.val()).filter(dev => dev.date === date);
+    }
+
+  } else if(user && !date){
+    // Sadece kullanıcı → son 4 günlük
+    const userSnap = await get(ref(db, `devriyeHistory/${user}`));
+    if(userSnap.exists()){
+      snaps = Object.values(userSnap.val())
+        .sort((a,b)=> b.date.localeCompare(a.date))
+        .slice(0,4);
+    }
+
+  } else if(!user && !date){
+    // Hiç filtre yok → bugünün verileri
+    const today = new Date().toISOString().split("T")[0];
+    const snap = await get(ref(db, "devriyeHistory"));
+    if(snap.exists()){
+      Object.values(snap.val()).forEach(userData=>{
+        Object.values(userData).forEach(dev=>{
+          if(dev.date===today) snaps.push(dev);
+        });
+      });
+    }
+  }
+
+  // normalize et ve points ekle
+  snaps.forEach(dev=>{
+    dev.status = normalizeStatus(dev.status);
+    dev.points = dev.points||[];
+    dev.displayDate = dev.date;
+  });
+
+  devriyeData = snaps;
+  filterTable();
+}
+
+/* ================== TABLE ================== */
+function populateTable(data){
+  table.clear();
+  data.forEach(d=>{
+    const rowClass =
+      d.status==="Tam devriye"?"complete":
+      d.status==="Yarım devriye"?"partial":"excess";
+
+    table.row.add([
+      d.user,
+      d.displayDate,
+      `<span class="status-badge status-${rowClass}">${d.status}</span>`,
+      d.start,
+      d.end,
+      d.points.length,
+      `<button onclick="showDetail('${d.user}','${d.timestamp}')">Detay</button>`
+    ]).node().className = rowClass;
+  });
+  table.draw();
+}
+
+/* ================== FILTERS ================== */
+function filterTable(){
+  const u=filterUser.value;
+  const s=filterStatus.value;
+  const d=filterDate.value;
+
+  const filtered = devriyeData.filter(x=>
+    (!u || x.user===u) &&
+    (!s || x.status===s) &&
+    (!d || x.date===d)
+  );
+
+  populateTable(filtered);
+  updateCards(filtered);
+}
+
+/* ================== CARDS ================== */
+function updateCards(data){
+  let t=data.length,c=0,p=0,e=0;
+  data.forEach(d=>{
+    if(d.status==="Tam devriye") c++;
+    else if(d.status==="Yarım devriye") p++;
+    else e++;
+  });
+  totalDevriye.textContent=t;
+  completeDevriye.textContent=c;
+  partialDevriye.textContent=p;
+  excessDevriye.textContent=e;
+}
+
+/* ================== DETAIL MODAL ================== */
+window.showDetail=(u,t)=>{
+  const d=devriyeData.find(x=>x.user===u && x.timestamp==t);
+  if(!d) return;
+  devriyeDetail.innerHTML=`
+    <b>Kullanıcı:</b> ${d.user}<br>
+    <b>Tarih:</b> ${d.displayDate}<br>
+    <b>Başlangıç:</b> ${d.start}<br>
+    <b>Bitiş:</b> ${d.end}<br>
+    <b>Durum:</b> ${d.status}<br>
+    <ul>${d.points.map(p=>`<li>${p}</li>`).join('')}</ul>
+  `;
+  detailModal.style.display="flex";
+};
+
+/* ================== EVENTS ================== */
+filterUser.onchange = ()=>{
+  loadDevries({user:filterUser.value||null, date:filterDate.value||null});
+};
+
+filterDate.onchange = ()=>{
+  loadDevries({user:filterUser.value||null, date:filterDate.value||null});
+};
+
+logoutBtn.onclick=()=>{
+  location.href=currentUser.type==="company"?"sirket.html":"yetkili.html";
+};
+
+/* ================== INITIAL LOAD ================== */
+filterDate.value="";
+loadAllGuards();                 
+loadDevries({date:new Date().toISOString().split("T")[0]}); 
+</script>
+
+</body>
+</html>

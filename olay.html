@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CGA Güvenlik Sistemi - Olay Bildir</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; font-family:'Montserrat', sans-serif; background: linear-gradient(135deg, #2c3e50, #34495e); color:#ecf0f1; display:flex; justify-content:center; align-items:flex-start; padding-top:30px; }
+  .container { background: rgba(44,62,80,0.95); padding:20px 30px; border-radius:16px; width:90%; max-width:500px; box-shadow:0 6px 20px rgba(0,0,0,0.5); }
+  h1 { text-align:center; margin-bottom:20px; }
+  label { display:block; margin-top:12px; margin-bottom:4px; font-weight:600; }
+  input[type=text], textarea, select { width:100%; padding:8px; border:none; border-radius:8px; margin-bottom:6px; font-size:14px; }
+  textarea { resize:none; height:100px; }
+  button { width:100%; padding:12px; margin-top:12px; border:none; border-radius:10px; font-weight:600; cursor:pointer; transition:0.3s; }
+  button:hover { opacity:0.9; }
+  #submitBtn { background:#27ae60; color:#fff; }
+  #backBtn { background:#c0392b; color:#fff; margin-top:6px; }
+  #photoBtns button { width:48%; margin-right:2%; }
+  #photoBtns button:last-child { margin-right:0; }
+  #message { margin-top:10px; text-align:center; font-size:14px; }
+  #preview { margin-top:6px; max-width:100%; border-radius:8px; display:none; }
+  #newOlayType { display:none; margin-top:4px; padding:6px; border-radius:6px; border:none; width:100%; }
+  #cameraModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; flex-direction:column; z-index:1000; }
+  #cameraModal video { width:90%; max-width:400px; border-radius:8px; }
+  #cameraModal button { width:48%; margin-top:12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Olay Bildir</h1>
+
+  <label for="olayType">Olay Türü</label>
+  <select id="olayType">
+    <option value="">Seçiniz</option>
+    <option value="Hırsızlık">Hırsızlık</option>
+    <option value="Gürültü">Gürültü</option>
+    <option value="Yangın">Yangın</option>
+    <option value="Şüpheli Kişi">Şüpheli Kişi</option>
+    <option value="Diğer">Diğer</option>
+  </select>
+  <input type="text" id="newOlayType" placeholder="Yeni olay türünü yaz...">
+
+  <label for="olayLocation">Olay Yeri / Blok</label>
+  <input type="text" id="olayLocation" placeholder="Örn: A Blok / Bahçe">
+
+  <label for="olayDesc">Olay Açıklaması</label>
+  <textarea id="olayDesc" placeholder="Olayı detaylı şekilde yazınız..."></textarea>
+
+  <div id="photoBtns">
+    <button id="takePhotoBtn">Fotoğraf Çek</button>
+    <button id="choosePhotoBtn">Galeriden Seç</button>
+  </div>
+
+  <img id="preview" alt="Fotoğraf Önizleme">
+
+  <input type="file" id="galleryInput" accept="image/*" style="display:none;">
+
+  <button id="submitBtn">Olayı Gönder</button>
+  <button id="backBtn">Güvenlik Paneline Dön</button>
+
+  <div id="message"></div>
+</div>
+
+<div id="cameraModal">
+  <video id="video" autoplay playsinline></video>
+  <div style="display:flex; justify-content:center; width:100%;">
+    <button id="snapBtn">Çek</button>
+    <button id="flashBtn">Flaş Aç/Kapa</button>
+    <button id="closeModalBtn">İptal</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, push, get, remove, query, limitToFirst } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+/* === QR ile seçilen site Firebase === */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if (!siteID || !siteConfigStr) {
+  alert("Site bağlantısı yok. Lütfen QR kodu tekrar okutunuz.");
+  window.location.href = "index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+// Aynı siteye tekrar bağlan
+let app = getApps().find(a => a.name === `siteApp-${siteID}`);
+if (!app) {
+  app = initializeApp(siteConfig, `siteApp-${siteID}`);
+}
+
+const db = getDatabase(app);
+
+
+
+const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+if(!currentUser || currentUser.type!=='security'){ 
+  alert("Güvenlik kullanıcı ile giriş!"); 
+  window.location.href="login.html"; 
+}
+
+const olayType=document.getElementById('olayType');
+const newOlayType=document.getElementById('newOlayType');
+const olayLocation=document.getElementById('olayLocation');
+const olayDesc=document.getElementById('olayDesc');
+const takePhotoBtn=document.getElementById('takePhotoBtn');
+const choosePhotoBtn=document.getElementById('choosePhotoBtn');
+const galleryInput=document.getElementById('galleryInput');
+const submitBtn=document.getElementById('submitBtn');
+const backBtn=document.getElementById('backBtn');
+const message=document.getElementById('message');
+const preview=document.getElementById('preview');
+
+const cameraModal=document.getElementById('cameraModal');
+const video=document.getElementById('video');
+const snapBtn=document.getElementById('snapBtn');
+const flashBtn=document.getElementById('flashBtn');
+const closeModalBtn=document.getElementById('closeModalBtn');
+
+let selectedBase64=null, stream=null, torchOn=false, isSubmitting=false;
+
+// 🔹 Diğer seçilince input göster/gizle
+olayType.addEventListener('change', () => {
+  if (olayType.value === 'Diğer') {
+    newOlayType.style.display = 'block';
+  } else {
+    newOlayType.style.display = 'none';
+    newOlayType.value = '';
+  }
+});
+
+// Kamera işlevleri
+takePhotoBtn.addEventListener('click', async()=>{
+  cameraModal.style.display='flex'; preview.style.display='none';
+  try{ 
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } }); 
+    video.srcObject=stream; 
+  }catch(e){ alert("Kamera açılamadı"); console.error(e);}
+});
+
+snapBtn.addEventListener('click', ()=>{
+  const canvas=document.createElement('canvas');
+  canvas.width=640; canvas.height=480;
+  canvas.getContext('2d').drawImage(video,0,0,640,480);
+  selectedBase64 = canvas.toDataURL('image/jpeg',0.9);
+  preview.src=selectedBase64; preview.style.display='block';
+  cameraModal.style.display='none';
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+});
+
+flashBtn.addEventListener('click', async ()=>{
+  if(!stream) return;
+  const track=stream.getVideoTracks()[0];
+  const capabilities=track.getCapabilities();
+  if(!capabilities.torch){ alert("Flaş desteklenmiyor"); return; }
+  torchOn=!torchOn;
+  try{ await track.applyConstraints({ advanced:[{torch:torchOn}] }); }catch(e){ console.error(e);}
+});
+
+closeModalBtn.addEventListener('click', ()=>{ 
+  cameraModal.style.display='none'; 
+  if(stream) stream.getTracks().forEach(t=>t.stop()); 
+});
+
+choosePhotoBtn.addEventListener('click', ()=> galleryInput.click());
+galleryInput.addEventListener('change', (e)=>{
+  const file=e.target.files[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=ev=>{ selectedBase64=ev.target.result; preview.src=selectedBase64; preview.style.display='block'; };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Olay gönderme
+submitBtn.addEventListener('click', async()=>{
+  if(isSubmitting) return;
+  message.innerText='';
+  if(!olayType.value.trim()||!olayLocation.value.trim()||!olayDesc.value.trim()){ 
+    message.innerText="Lütfen zorunlu alanları doldurun!"; 
+    return; 
+  }
+  isSubmitting=true;
+
+  let olaySecim = olayType.value;
+  if(olaySecim==='Diğer' && newOlayType.value.trim()!==''){
+    olaySecim = newOlayType.value.trim();
+    const option=document.createElement('option'); 
+    option.value=olaySecim; 
+    option.text=olaySecim; 
+    olayType.insertBefore(option, olayType.lastElementChild);
+  }
+
+  const userKey = currentUser.username || currentUser.name;
+  const userRef = ref(db,'securityEvents/'+userKey);
+
+  const newOlay={
+    type:olaySecim,
+    location:olayLocation.value,
+    description:olayDesc.value,
+    reportedBy:userKey,
+    timestamp:Date.now(),
+    date:new Date().toLocaleDateString('tr-TR'),
+    time:new Date().toLocaleTimeString('tr-TR')
+  };
+
+  if(selectedBase64){
+    const img = new Image();
+    img.src = selectedBase64;
+    await new Promise(res=> img.onload = res);
+    const canvas = document.createElement('canvas');
+    const scale = 400 / img.width;
+    canvas.width = 400;
+    canvas.height = img.height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const compressed = canvas.toDataURL('image/jpeg', 0.7);
+    newOlay.photoData = compressed;
+  }
+
+  try{
+    const snapshot = await get(userRef);
+    if(snapshot.exists()){
+      const keys=Object.keys(snapshot.val());
+      if(keys.length>=50){ 
+        await remove(ref(db,'securityEvents/'+userKey+'/'+keys[0])); 
+      }
+    }
+
+    let progress=0;
+    message.innerText=`Yükleniyor ${progress}%`;
+    const interval = setInterval(()=>{ 
+      progress+=10; 
+      if(progress>100) progress=100; 
+      message.innerText=`Yükleniyor ${progress}%`; 
+    },50);
+
+    await push(userRef,newOlay);
+    clearInterval(interval);
+    message.innerText="✅ Olay bildirildi!";
+
+    olayType.value=''; olayLocation.value=''; olayDesc.value='';
+    newOlayType.value=''; newOlayType.style.display='none';
+    selectedBase64=null; galleryInput.value=''; preview.style.display='none';
+  }catch(err){ 
+    console.error(err); 
+    message.innerText="❌ Olay bildirilemedi!"; 
+  }
+  isSubmitting=false;
+});
+
+backBtn.addEventListener('click', ()=> window.location.href='guvenlik.html');
+
+</script>
+</body>
+</html>
+

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ziyaretçi Kayıt Sistemi PRO</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root{
+  --ana:#007bff; --ana-glow:#39a9ff;
+  --bg:#0d1117; --card:#161b22;
+  --text:#d0d7de; --danger:#ff0033;
+}
+*{box-sizing:border-box;transition:.25s;font-family:"Segoe UI";}
+body{margin:0;background:var(--bg);color:var(--text);padding-top:90px;}
+header{
+  position:fixed;top:0;left:0;width:100%;z-index:99;
+  padding:16px 24px;display:flex;
+  justify-content:space-between;align-items:center;
+  background:rgba(13,17,23,0.75);backdrop-filter:blur(18px);
+  border-bottom:1px solid #222;
+}
+header h1{
+  font-size:24px;font-weight:900;text-transform:uppercase;
+  background:linear-gradient(90deg,#fff,#5fc2ff);
+  -webkit-background-clip:text;color:transparent;
+}
+.navBtn{
+  width:44px;height:44px;border-radius:12px;
+  display:flex;justify-content:center;align-items:center;
+  background:#111;border:1px solid #222;color:white;font-size:18px;
+}
+.navBtn:hover{transform:scale(1.15);box-shadow:0 0 15px var(--ana-glow);}
+#clock{
+  font-size:40px;margin:20px auto;text-align:center;
+  font-family:monospace;color:#00eaff;text-shadow:0 0 10px #00eaff;
+}
+#container{
+  width:92%;max-width:1250px;margin:auto;
+  display:grid;grid-template-columns:1fr 1fr;gap:32px;
+}
+.kart{
+  background:var(--card);border-radius:22px;
+  padding:30px;border:1px solid #222;
+  box-shadow:0 0 20px rgba(0,0,0,.4);
+}
+.kart h2{
+  margin:0 0 20px;font-size:26px;font-weight:900;color:var(--ana-glow);
+}
+#kimKaydediyor{
+  background:#0b1320;padding:14px;border-radius:14px;
+  margin-bottom:14px;text-align:center;
+  border-left:5px solid var(--ana);
+  font-weight:700;
+}
+#alanlar input{
+  padding:14px;border-radius:14px;width:100%;
+  background:#0b0f14;border:1px solid #333;color:white;margin-bottom:10px;
+  font-size:17px;
+}
+#alanlar input:focus{border-color:var(--ana-glow);box-shadow:0 0 12px var(--ana-glow);}
+#inBtn{
+  background:var(--ana);border:none;width:100%;
+  margin-top:8px;padding:18px;border-radius:16px;
+  color:white;font-size:20px;font-weight:700;
+}
+#inBtn:hover{box-shadow:0 0 16px var(--ana-glow);transform:scale(1.02);}
+#liste{width:100%;border-collapse:collapse;margin-top:10px;}
+#liste th{background:#0b4a7a;color:white;padding:14px;border-radius:10px;}
+#liste td{
+  background:#0b0f14;padding:14px;text-align:center;
+  border-bottom:1px solid #151A22;
+}
+#liste tr:hover td{background:#10202e;}
+.tablo-btn{
+  padding:10px 14px;background:var(--danger);
+  border-radius:8px;color:white;font-weight:700;
+}
+.toast{
+  position:fixed;right:20px;bottom:20px;background:#161b22;
+  padding:18px 26px;border-radius:14px;border:1px solid #333;
+  opacity:0;transition:.4s;color:white;
+}
+.toast.show{opacity:1;}
+</style>
+</head>
+
+<body>
+
+<header>
+  <button class="navBtn" id="geriBtn"><i class="fa-solid fa-arrow-left"></i></button>
+  <h1><i class="fa-solid fa-shield-halved"></i> Kayıt Sistemi</h1>
+  <button class="navBtn" id="gecmisBtn"><i class="fa-solid fa-clock-rotate-left"></i></button>
+</header>
+
+<div id="clock">00:00:00</div>
+
+<div id="container">
+  <div class="kart">
+    <h2>🚪 Ziyaretçi Girişi</h2>
+    <div id="kimKaydediyor"></div>
+    <div id="alanlar"></div>
+    <button id="inBtn"><i class="fa-solid fa-door-open"></i> GİRİŞ</button>
+  </div>
+
+  <div class="kart">
+    <h2>📌 Aktif Kayıtlar</h2>
+    <table id="liste"></table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 🔥 FIREBASE (SADECE QR FIREBASE) -->
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+/* 🔐 QR'DAN GELEN FIREBASE */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if(!siteID || !siteConfigStr){
+  alert("Site bağlantısı yok. QR tekrar okutulmalı.");
+  location.href="index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+let app = getApps().find(a=>a.name===`siteApp-${siteID}`);
+if(!app) app = initializeApp(siteConfig, `siteApp-${siteID}`);
+
+const db = getDatabase(app);
+
+/* 🔔 TOAST */
+const toast = m=>{
+  const t=document.getElementById("toast");
+  t.textContent=m; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),2500);
+}
+
+/* ⏱ SAAT */
+setInterval(()=>clock.textContent=new Date().toLocaleTimeString("tr-TR"),1000);
+
+/* 🔄 ALANLAR */
+let aktifAlanlar=[];
+onValue(ref(db,"panel/alanlar/"),snap=>{
+  const div=document.getElementById("alanlar"),data=snap.val();
+  div.innerHTML=""; aktifAlanlar=[];
+  if(!data){div.innerHTML="<p>⚠️ Alan yok.</p>";return;}
+  Object.keys(data).forEach(k=>{
+    let a=data[k],i=document.createElement("input");
+    i.id=k; i.placeholder=a.adi+(a.zorunlu?" *":"");
+    i.dataset.zorunlu=a.zorunlu; div.appendChild(i);
+    if(a.aktifAlandaGoster) aktifAlanlar.push({key:k,ad:a.adi});
+  });
+});
+
+/* 👮 AKTİF GÜVENLİK */
+const active = sessionStorage.getItem("activeSecurity");
+
+if(active){
+  onValue(ref(db,"ziyaretciler/"+active),snap=>{
+    const z=snap.val()||{},t=Object.keys(z).length;
+    const b=new Date().toLocaleDateString("tr-TR");
+    const bugun=Object.values(z).filter(x=>x.giris?.startsWith(b)).length;
+    kimKaydediyor.innerHTML=`👮 <b>${active}</b> | 📌 Bugün: <b>${bugun}</b> | 📊 Toplam: <b>${t}</b>`;
+  });
+}
+
+/* 🚪 GİRİŞ */
+function kaydet(){
+  if(!active) return toast("❌ Güvenlik yok, QR tekrar okut");
+  const inputs=document.querySelectorAll("#alanlar input");
+  let kayit={},hata=false;
+  inputs.forEach(i=>{
+    if(i.dataset.zorunlu=="true"&&!i.value.trim())hata=true;
+    kayit[i.id]=i.value;
+  });
+  if(hata) return toast("❗ Zorunlu Alanları Doldurun!");
+  kayit.giris=new Date().toLocaleString("tr-TR");
+  kayit.cikis=null;
+  set(ref(db,"ziyaretciler/"+active+"/"+push(ref(db)).key),kayit);
+  inputs.forEach(i=>i.value="");
+  toast("✔️ Kayıt Alındı!");
+}
+inBtn.onclick=kaydet;
+document.addEventListener("keydown",e=>{if(e.key==="Enter")kaydet();});
+
+/* 📋 TABLO */
+onValue(ref(db,"ziyaretciler/"),snap=>{
+  let html="<tr>";
+  aktifAlanlar.forEach(a=>html+=`<th>${a.ad}</th>`);
+  html+="<th>Giriş</th><th>Çıkış</th><th>Güvenlik</th></tr>";
+  snap.forEach(g=>{
+    Object.keys(g.val()||{}).forEach(id=>{
+      let v=g.val()[id];
+      if(!v.cikis){
+        html+=`<tr>`;
+        aktifAlanlar.forEach(a=>html+=`<td>${v[a.key]||"-"}</td>`);
+        html+=`<td>${v.giris}</td>
+        <td><button class="tablo-btn" onclick="cikis('${g.key}','${id}')">Çıkış</button></td>
+        <td>${g.key}</td></tr>`;
+      }
+    });
+  });
+  liste.innerHTML=html;
+});
+
+window.cikis=(g,id)=>{
+  update(ref(db,`ziyaretciler/${g}/${id}`),{cikis:new Date().toLocaleString("tr-TR")});
+  toast("🚪 Çıkış Yapıldı!");
+}
+
+/* 🔘 GEÇİŞ */
+gecmisBtn.onclick=()=>location.href="tumkayit.html";
+geriBtn.onclick=()=>location.href="guvenlik.html";
+</script>
+
+</body>
+</html>

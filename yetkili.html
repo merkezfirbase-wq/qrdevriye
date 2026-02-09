@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yetkili Paneli</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body {
+  margin:0;
+  font-family:'Roboto',sans-serif;
+  background:#1f2a38;
+  color:#e0e0e0;
+  min-height:100vh;
+  padding:20px;
+  display:flex;
+  justify-content:center;
+}
+@media (max-width: 1024px){
+  .panel-wrapper {
+    grid-template-columns: 1fr; /* tüm paneller alt alta gelir */
+  }
+  header {flex-direction:column; align-items:flex-start; gap:10px;}
+  #searchInput {width:100%; margin-bottom:8px;}
+  #searchBtn {width:100%;}
+  header button {width:100%; margin:3px 0;}
+  table, th, td {font-size:0.85rem;}
+}
+/* Tüm form elemanları: input, textarea, select (PC ve tüm ekranlar için) */
+input, textarea, select {
+box-sizing: border-box;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: #1a2b3a; /* panel ile uyumlu koyu arka plan */
+  color: #fff;
+  font-size: 1rem;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+  transition: 0.3s;
+  outline: none;
+}
+
+/* focus efekti */
+input:focus, textarea:focus, select:focus {
+  border-color: #ffcc00;
+  box-shadow: 0 0 8px #ffcc00;
+}
+
+/* placeholder renkleri */
+::placeholder {
+  color: rgba(255,255,255,0.6);
+}
+
+/* select kutusundaki varsayılan ok simgesini temizle */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="16" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+.panel {
+  background: linear-gradient(145deg,#1f2a38,#263248);
+  border-radius:20px;
+  padding:20px;
+  box-shadow:0 8px 20px rgba(0,0,0,0.6);
+}
+
+.panel h2 {
+  margin-top:0;
+  margin-bottom:15px;
+  color:#ffcc00;
+  border-bottom:1px solid rgba(255,255,255,0.2);
+  padding-bottom:5px;
+}
+
+/* ===================== TEXTAREA ===================== */
+textarea {
+  width:100%;
+  min-height:120px;
+  padding:12px;
+  font-size:1rem;
+  border-radius:15px;
+  border:none;
+  background:#1a2b3a;
+  color:#fff;
+  resize:vertical;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+}
+textarea:focus {
+  outline:none;
+  box-shadow:0 0 8px #ffcc00;
+}
+
+/* ===================== BUTTON ===================== */
+button {
+  border-radius:15px;
+  padding:12px 20px;
+  font-size:0.95rem;
+  font-weight:600;
+  cursor:pointer;
+  border:none;
+  transition:0.3s;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+#createUserBtn {background:linear-gradient(45deg,#27ae60,#2ecc71); color:#fff;}
+.delete {background:linear-gradient(45deg,#e74c3c,#ff6b6b); color:#fff;}
+.edit {background:linear-gradient(45deg,#9b59b6,#8e44ad); color:#fff;}
+#sendMsgBtn {background:linear-gradient(45deg,#2980b9,#3498db); color:#fff;}
+button:hover {
+  transform:translateY(-2px);
+  opacity:0.9;
+  box-shadow:0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* ===================== TABLE ===================== */
+th, td {
+  padding:10px;
+  text-align:left;
+  background:#1a2b3a;
+  border-bottom:1px solid rgba(255,255,255,0.15);
+}
+th {
+  background:#2c3e50;
+  color:#ffcc00;
+  text-transform:uppercase;
+}
+tr:hover {background: rgba(52,152,219,0.2);}
+
+/* ===================== HEADER ===================== */
+header {
+  grid-column: span 2;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+}
+header h1 {
+  color:#ffcc00;
+  margin:0;
+  font-size:1.8rem;
+}
+header button {
+  background:#e67e22;
+  color:#fff;
+  border-radius:12px;
+  padding:8px 15px;
+  margin:5px 3px;
+  font-size:0.85rem;
+}
+
+/* ===================== MODALS ===================== */
+.modal {
+  display:none;
+  position:fixed;
+  z-index:999;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.85);
+  justify-content:center;
+  align-items:center;
+  padding:10px;
+  overflow-y:auto;
+}
+.modal-content {
+  background:#1f2a38;
+  padding:20px;
+  border-radius:12px;
+  width:100%;
+  max-width:400px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.modal-content input, .modal-content textarea {margin:0;}
+
+/* ===================== PROFİL SİMGESİ ===================== */
+#profileBtn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #3498db; /* mavi renk */
+  color: #fff;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  transition: 0.3s;
+}
+
+#profileBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* ===================== ARAMA BUTONU ===================== */
+#searchInput {width:calc(100% - 90px); display:inline-block;}
+#searchBtn {width:80px; display:inline-block; background:#3498db; color:#fff;}
+
+/* ===================== PAGINATION ===================== */
+.pagination {
+  margin-top:10px;
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+}
+.page-btn {
+  background:#2980b9;
+  color:#fff;
+  border-radius:8px;
+  padding:5px 10px;
+  cursor:pointer;
+  font-size:0.85rem;
+}
+.page-btn.active {background:#ffcc00; color:#000;}
+.password-info {margin-top:5px; color:#ffcc00; font-size:0.85rem;}
+.progress-container {
+  width:100%;
+  background:#1a2b3a;
+  border-radius:12px;
+  height:25px;
+  margin-top:10px;
+  overflow:hidden;
+}
+.progress-bar {
+  height:100%;
+  width:0%;
+  background:#27ae60;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#000;
+  font-weight:bold;
+  font-size:0.85rem;
+}
+#totalUsers {margin-bottom:10px; font-weight:bold; color:#ffcc00;}
+
+/* ===================== MOBİL UYUMLULUK ===================== */
+@media (max-width: 1024px){
+  .panel-wrapper {grid-template-columns:1fr;}
+  header {flex-direction:column; align-items:flex-start; gap:10px;}
+  #searchInput {width:100%; margin-bottom:8px;}
+  #searchBtn {width:100%;}
+  header button {width:100%; margin:3px 0;}
+  table, th, td {font-size:0.85rem;}
+}
+@media (max-width: 480px){
+  body {padding:10px;}
+  .panel {padding:15px;}
+  header h1 {font-size:1.5rem;}
+  input, select, textarea, button {font-size:0.9rem; padding:8px;}
+  .modal-content {width:95%; padding:15px;}
+  th, td {padding:8px;}
+  .progress-bar {font-size:0.75rem;}
+  #profileBtn {
+  top: 10px;
+  right: 10px;
+  width: 45px;
+  height: 45px;
+  font-size: 20px;
+}
+/* Tüm form elemanları: input, textarea, select */
+input, textarea, select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: #1a2b3a; /* panel ile uyumlu koyu arka plan */
+  color: #fff;
+  font-size: 1rem;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+  transition: 0.3s;
+  outline: none;
+}
+
+/* focus efekti */
+input:focus, textarea:focus, select:focus {
+  border-color: #ffcc00;
+  box-shadow: 0 0 8px #ffcc00;
+}
+
+/* placeholder renkleri */
+::placeholder {
+  color: rgba(255,255,255,0.6);
+}
+
+/* select kutusundaki varsayılan ok simgesini temizle */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="16" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+/* responsive: mobilde padding ve font küçülür */
+@media (max-width: 480px) {
+  input, textarea, select {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<div class="panel-wrapper">
+
+<header>
+  <h1>Yetkili Paneli</h1>
+  <div class="header-buttons">
+    <button id="olayBtn">Olay Bildirimleri</button>
+    <button id="patrolBtn">Devriye Takip</button>
+    <button id="watchBtn" onclick="window.location.href='tamam.html'">Nöbet Takip</button>
+    <button id="logoutBtn">Çıkış</button>
+  </div>
+  <button id="profileBtn">👤</button>
+</header>
+
+
+<!-- Yeni Kullanıcı Oluştur Paneli -->
+<div class="panel">
+<h2>Yeni Kullanıcı Oluştur</h2>
+<select id="newType">
+  <option value="resident">Site Sakini</option>
+  <option value="security">Güvenlik</option>
+</select>
+
+<div id="residentFields">
+  <select id="newBlock"></select>
+  <input type="text" id="newApartment" placeholder="Daire Numarası">
+</div>
+
+<div id="securityFields" style="display:none;">
+  <input type="text" id="newFullName" placeholder="Ad Soyad">
+  <input type="text" id="newPhone" placeholder="Telefon Numarası">
+</div>
+
+<input type="password" id="newPassword" placeholder="Şifre" readonly>
+<div class="password-info" id="passwordInfo"></div>
+<button id="createUserBtn">Oluştur</button>
+<div id="createMsg"></div>
+</div>
+
+<!-- Kullanıcı Tablosu Paneli -->
+<div class="panel" style="grid-column: span 2;">
+<h2>Kullanıcılar</h2>
+<div id="totalUsers"></div>
+<div>
+<input type="text" id="searchInput" placeholder="Ara...">
+<button id="searchBtn">Ara</button>
+</div>
+<table>
+<thead>
+<tr><th>Daire / Ad Soyad</th><th>Blok / Telefon</th><th>Tip</th><th>Şifre</th><th>İşlem</th></tr>
+</thead>
+<tbody id="usersTable"></tbody>
+</table>
+<div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Modallar: Düzenleme ve Profil -->
+<div id="editModal" class="modal">
+<div class="modal-content">
+<h3>Düzenle</h3>
+<div id="editResidentFields">
+<label>Daire Numarası</label>
+<input type="text" id="editApartment" disabled>
+</div>
+<div id="editSecurityFields" style="display:none;">
+<label>Ad Soyad</label>
+<input type="text" id="editFullName" disabled>
+<label>Telefon</label>
+<input type="text" id="editPhone">
+</div>
+<label>Şifre</label>
+<input type="text" id="editPassword">
+<button id="saveEditBtn">Kaydet</button>
+<button id="closeEditBtn">Kapat</button>
+</div>
+</div>
+
+<div id="profileModal" class="modal">
+<div class="modal-content">
+<h3>Profil</h3>
+<label>Kullanıcı Adı</label>
+<input type="text" id="profileUsername" disabled>
+<label>Eski Şifre</label>
+<input type="password" id="oldProfilePassword" placeholder="Eski şifre">
+<label>Yeni Şifre</label>
+<input type="password" id="profilePassword" placeholder="Yeni şifre">
+<button id="saveProfileBtn">Güncelle</button>
+<button id="closeProfileBtn" style="background:#c0392b;">Kapat</button>
+</div>
+</div>
+
+<!-- JS kısmı tamamen korunmuş şekilde -->
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, set, get, update, onValue, remove } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+/* === QR ile seçilen site Firebase === */
+const siteID = localStorage.getItem("siteID");
+const siteConfigStr = localStorage.getItem("siteConfig");
+
+if (!siteID || !siteConfigStr) {
+  alert("Site bağlantısı yok. Lütfen QR kodu tekrar okutunuz.");
+  window.location.href = "index.html";
+}
+
+const siteConfig = JSON.parse(siteConfigStr);
+
+// Aynı siteye tekrar bağlan
+let app = getApps().find(a => a.name === `siteApp-${siteID}`);
+if (!app) {
+  app = initializeApp(siteConfig, `siteApp-${siteID}`);
+}
+
+const db = getDatabase(app);
+
+/* === ADMIN KONTROLÜ (SESSION'DA KALMALI) === */
+const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+if (!currentUser || currentUser.type !== "admin") {
+  alert("Yetkisiz erişim!");
+  window.location.href = "index.html";
+}
+
+/* === ÇIKIŞ === */
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  sessionStorage.removeItem('currentUser');
+  window.location.href = 'index.html';
+});
+
+
+
+document.getElementById('logoutBtn').addEventListener('click', ()=>{ sessionStorage.removeItem('currentUser'); window.location.href='index.html'; });
+document.getElementById('patrolBtn').addEventListener('click', ()=>{ window.location.href = 'takip.html'; });
+document.getElementById('olayBtn').addEventListener('click', () => { window.location.href = 'olaylar.html'; });
+
+const profileBtn = document.getElementById('profileBtn');
+const profileModal = document.getElementById('profileModal');
+const profileUsername = document.getElementById('profileUsername');
+const oldProfilePassword = document.getElementById('oldProfilePassword');
+const profilePassword = document.getElementById('profilePassword');
+const saveProfileBtn = document.getElementById('saveProfileBtn');
+const closeProfileBtn = document.getElementById('closeProfileBtn');
+
+profileBtn.addEventListener('click', ()=>{ profileUsername.value=currentUser.username; oldProfilePassword.value=""; profilePassword.value=""; profileModal.style.display="flex"; });
+closeProfileBtn.addEventListener('click', ()=>profileModal.style.display="none");
+saveProfileBtn.addEventListener('click', async ()=>{ 
+  const oldPass = oldProfilePassword.value.trim();
+  const newPass = profilePassword.value.trim();
+  if(!oldPass||!newPass){ alert("Alanlar boş olamaz!"); return; }
+  const snapshot = await get(ref(db,'users/'+currentUser.username));
+  if(snapshot.exists() && snapshot.val().password === oldPass){
+    await update(ref(db,'users/'+currentUser.username), {password:newPass});
+    alert("Şifre güncellendi!");
+    profileModal.style.display="none";
+  } else { alert("Eski şifre yanlış!"); }
+});
+
+// Form alanları ve şifre otomatik
+const newType = document.getElementById('newType');
+const residentFields = document.getElementById('residentFields');
+const securityFields = document.getElementById('securityFields');
+const newPassword = document.getElementById('newPassword');
+const passwordInfo = document.getElementById('passwordInfo');
+
+for(let c=65;c<=90;c++){document.getElementById('newBlock').innerHTML += `<option value="${String.fromCharCode(c)}">${String.fromCharCode(c)}</option>`;}
+
+function updatePasswordField(){
+  if(newType.value==='resident'){
+    const block = document.getElementById('newBlock').value;
+    const apartment = document.getElementById('newApartment').value.trim();
+    const pwd = block && apartment ? (block+apartment) : '';
+    newPassword.value = pwd;
+    passwordInfo.textContent = pwd ? `Şifre otomatik atandı Şifreniz => ${pwd} <= Bu şifreyi profilinizden değiştirebilirsiniz` : '';
+  } else {
+    const fullName = document.getElementById('newFullName').value.trim().toUpperCase();
+    const pwd = fullName;
+    newPassword.value = pwd;
+    passwordInfo.textContent = pwd ? `Şifre otomatik atandı Şifreniz => ${pwd} <= Bu şifreyi profilinizden değiştirebilirsiniz` : '';
+  }
+}
+
+newType.addEventListener('change', ()=>{ 
+  if(newType.value==='resident'){ residentFields.style.display='block'; securityFields.style.display='none'; } 
+  else { residentFields.style.display='none'; securityFields.style.display='block'; } 
+  updatePasswordField(); 
+});
+// ====== Türkçe karakterleri doğru büyük harfe çevirme ======
+function toTurkishUpper(str) {
+  const letters = { 'i': 'İ', 'ı': 'I', 'ş': 'Ş', 'ğ': 'Ğ', 'ü': 'Ü', 'ö': 'Ö', 'ç': 'Ç' };
+  return str.replace(/([iışğüöç])/g, letter => letters[letter]).toUpperCase();
+}
+
+// ====== newFullName input event ======
+document.getElementById('newFullName').addEventListener('input', e => {
+  e.target.value = toTurkishUpper(e.target.value);
+  updatePasswordField();
+});
+
+document.getElementById('newBlock').addEventListener('input', updatePasswordField);
+document.getElementById('newApartment').addEventListener('input', updatePasswordField);
+
+// Kullanıcı listeleme
+const usersTable = document.getElementById('usersTable');
+const paginationDiv = document.getElementById('pagination');
+const totalUsersDiv = document.getElementById('totalUsers');
+let allUsers = {};
+let filteredUsers = [];
+let currentPage = 1;
+const pageSize = 20;
+
+function listUsers(){
+  const usersRef = ref(db,'users');
+  onValue(usersRef, snapshot=>{
+    allUsers = snapshot.val() || {};
+    applyFilter();
+  });
+}
+
+function applyFilter(){
+  const searchVal = document.getElementById('searchInput').value.toLowerCase();
+  filteredUsers = Object.values(allUsers).filter(u=>{
+    if(u.type!=='resident' && u.type!=='security') return false;
+    if(searchVal==='') return true;
+    if(u.type==='resident'){ return (u.block+u.username).toLowerCase().includes(searchVal); } 
+    else { return (u.fullName && u.fullName.toLowerCase().includes(searchVal)) || (u.phone && u.phone.includes(searchVal)); }
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable(){
+  usersTable.innerHTML='';
+  totalUsersDiv.textContent = `Toplam Kullanıcı: ${filteredUsers.length}`;
+  const start = (currentPage-1)*pageSize;
+  const end = start + pageSize;
+filteredUsers.slice(start,end).forEach(u=>{
+    const tr = document.createElement('tr');
+    const nameCol = u.type==='resident' ? u.username : u.fullName;
+    const blockCol = u.type==='resident' ? u.block : u.phone;
+    const typeCol = u.type==='resident' ? "Site Sakini" : "Güvenlik";
+
+    // Düzenle butonu sadece site sakinleri için
+    const actionBtns = u.type === 'security' 
+      ? `<button class="delete" data-username="${u.username}">Sil</button>` 
+      : `<button class="edit" data-username="${u.username}">Düzenle</button>
+         <button class="delete" data-username="${u.username}">Sil</button>`;
+
+    tr.innerHTML = `<td>${nameCol}</td>
+                    <td>${blockCol}</td>
+                    <td>${typeCol}</td>
+                    <td>${u.type === 'security' ? '****' : u.password}</td>
+                    <td>${actionBtns}</td>`;
+    usersTable.appendChild(tr);
+});
+
+  renderPagination();
+  attachRowEvents();
+}
+
+
+function renderPagination(){
+  paginationDiv.innerHTML='';
+  const totalPages = Math.ceil(filteredUsers.length/pageSize);
+  for(let i=1;i<=totalPages;i++){
+    const btn = document.createElement('button');
+    btn.className='page-btn'+(i===currentPage?' active':'');
+    btn.textContent=i;
+    btn.onclick=()=>{ currentPage=i; renderTable(); };
+    paginationDiv.appendChild(btn);
+  }
+}
+
+document.getElementById('searchBtn').addEventListener('click', applyFilter);
+document.getElementById('searchInput').addEventListener('keyup', e=>{ if(e.key==='Enter') applyFilter(); });
+
+// Yeni kullanıcı oluştur
+document.getElementById('createUserBtn').addEventListener('click', async ()=>{
+  const type = newType.value;
+  let username, phone, block, apartment, fullName;
+  if(type==='resident'){ block=document.getElementById('newBlock').value; apartment=document.getElementById('newApartment').value.trim(); if(!block||!apartment){alert('Daire ve blok gerekli!'); return;} username=block+apartment; } 
+  else { fullName=document.getElementById('newFullName').value.trim().toUpperCase(); phone=document.getElementById('newPhone').value.trim(); if(!fullName||!phone){alert('İsim ve telefon gerekli!'); return;} username=fullName; }
+  const pwd=newPassword.value;
+  await set(ref(db,'users/'+username),{type,username,password:pwd,phone:phone||'',block:block||'',apartment:apartment||'',fullName:fullName||''});
+  alert("Kullanıcı oluşturuldu!");
+  location.reload();
+});
+
+// Düzenle ve silme işlemleri
+function attachRowEvents(){
+  document.querySelectorAll('.delete').forEach(btn=>{ btn.onclick = async ()=>{ if(confirm("Silmek istediğinize emin misiniz?")){ await remove(ref(db,'users/'+btn.dataset.username)); } }; });
+  document.querySelectorAll('.edit').forEach(btn=>{
+    btn.onclick=async ()=>{
+      const u = allUsers[btn.dataset.username];
+      const editModal = document.getElementById('editModal');
+      if(u.type==='resident'){
+        document.getElementById('editResidentFields').style.display='block';
+        document.getElementById('editSecurityFields').style.display='none';
+        document.getElementById('editApartment').value=u.username;
+      } else {
+        document.getElementById('editResidentFields').style.display='none';
+        document.getElementById('editSecurityFields').style.display='block';
+        document.getElementById('editFullName').value=u.fullName;
+        document.getElementById('editPhone').value=u.phone;
+      }
+      document.getElementById('editPassword').value=u.password;
+      editModal.style.display='flex';
+      document.getElementById('saveEditBtn').onclick=async ()=>{
+        const newPass = document.getElementById('editPassword').value.trim();
+        const newPhone = u.type==='security'?document.getElementById('editPhone').value.trim():undefined;
+        const updates = {password:newPass};
+        if(newPhone) updates.phone=newPhone;
+        await update(ref(db,'users/'+btn.dataset.username), updates);
+        alert("Güncellendi!");
+        editModal.style.display='none';
+      };
+      document.getElementById('closeEditBtn').onclick=()=>editModal.style.display='none';
+    };
+  });
+}
+
+// Mesaj Gönderme Özelliği ve Otomatik Satır Kırma
+
+listUsers();
+</script>
+
+</body>
+</html>
+

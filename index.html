@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b1a27">
+<title>CGA Güvenlik Sistemleri - Giriş Paneli</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+
+<style>
+:root {
+  color-scheme: dark;
+  --cga-bg-main: #0b1a27;
+  --cga-bg-secondary: #1a2b3f;
+  --cga-gold: #f1c40f;
+  --cga-green: #2ecc71;
+  --cga-green-dark: #27ae60;
+  --cga-text-main: #ecf0f1;
+  --cga-card-bg: rgba(255,255,255,0.06);
+  --cga-border-soft: rgba(255,255,255,0.12);
+}
+
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+  font-family: 'Montserrat', sans-serif;
+  display: flex; justify-content: center; align-items: center;
+  background: radial-gradient(circle at top, rgba(241,196,15,0.08), transparent 40%),
+              linear-gradient(135deg, var(--cga-bg-main), var(--cga-bg-secondary));
+  color: var(--cga-text-main);
+  -webkit-touch-callout: none;
+}
+
+.container {
+  width: 380px;
+  padding: 40px 30px 70px;
+  border-radius: 26px;
+  background: var(--cga-card-bg);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 0 0 1px var(--cga-border-soft), 0 20px 50px rgba(0,0,0,0.7);
+  text-align: center;
+  transform: translateY(-20px);
+}
+
+h1 { font-size:26px; font-weight:800; color: var(--cga-gold); margin-bottom:8px; cursor:pointer; }
+
+.site-name{
+  display:none; font-size:28px; font-weight:800; letter-spacing:1px; margin:1px 0 18px;
+  color:#2ecc71; text-shadow:0 0 10px rgba(46,204,113,0.6),0 0 25px rgba(46,204,113,0.4);
+}
+
+.input-group { display:none; flex-direction:column; text-align:left; margin-bottom:28px; }
+.input-group.active { display:flex; }
+
+input[type="text"], input[type="password"] { width:100%; padding:12px; margin:8px 0; border-radius:12px; border:none; background: rgba(255,255,255,0.1); color:white; font-size:14px;}
+input::placeholder { color: rgba(236,240,241,0.6); }
+
+.remember {display:flex; align-items:center; gap:8px; font-size:14px; margin-top:8px;}
+.remember input[type="checkbox"] { cursor:pointer; }
+.remember label { cursor:pointer; color:#fff; }
+
+.loginBtn {
+  width: 150px;
+  padding: 13px;
+  border: none;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  margin-bottom: 0;
+  background: linear-gradient(90deg, var(--cga-green-dark), var(--cga-green));
+  box-shadow: 0 6px 20px rgba(46,204,113,0.45);
+  transition: 0.25s;
+}
+.loginBtn:hover {
+  background: linear-gradient(90deg, #2ecc71, #27ae60);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.message {
+  margin-top:15px;
+  margin-bottom:40px;
+  color:#e74c3c;
+  font-weight:600;
+  text-align:center;
+  min-height:20px;
+}
+
+.cga-logo { width:450px; max-width:80%; margin:20px auto 0; }
+.corner-bottom{ position: fixed; bottom:12px; right:14px; font-size:11px; color: rgba(189,195,199,0.7); user-select:none; pointer-events:none; }
+.corner-top{ position: fixed; top:10px; right:14px; font-size:10px; color: rgba(189,195,199,0.7); user-select:none; pointer-events:none; }
+
+.securityText{
+  font-size:16px; font-weight:700; color: var(--cga-gold); margin-bottom:20px; cursor:pointer; text-align:center;
+  padding:8px 0; letter-spacing:0.5px; transition:0.25s;
+}
+.securityText:hover{ transform: scale(1.06); color:#f7d35e; }
+
+#qr-reader {
+  width: 95vw;
+  height: 70vh;
+  max-width: 600px;
+  max-height: 600px;
+  margin: auto;
+  border-radius: 12px;
+  background: #000;
+}
+
+.modal-content { max-width: 95%; }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal.hidden { display: none; }
+
+.modal-box {
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 12px;
+  width: 85%;
+  max-width: 320px;
+  text-align: center;
+  color: #fff;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+#cancelDisconnect { background: #555; color: #fff; }
+#confirmDisconnect { background: #e74c3c; color: #fff; }
+
+.disconnect-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.disconnect-modal.hidden { display: none; }
+
+* { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+
+.choiceBtn {
+  flex:1;
+  border:none;
+  border-radius:10px;
+  font-weight:700;
+  cursor:pointer;
+  background: rgba(255,255,255,0.1);
+  color:#fff;
+  transition:0.25s;
+}
+.choiceBtn:hover { background: rgba(46,204,113,0.3); transform: scale(1.05); }
+.choiceBtn.active { background: linear-gradient(90deg,#2ecc71,#27ae60); color:#fff; }
+
+.modal { position: fixed; inset:0; background: rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:9999; transition:0.3s; }
+.modal.hidden { display:none; }
+.modal-box { background:#1e1e1e; border-radius:12px; color:#fff; }
+
+#secLoginBtn {
+  width: 60%;
+  max-width: 220px;
+  padding: 14px 0;
+  margin: 20px auto 0;
+  display: block;
+  font-size: 18px;
+  border-radius: 18px;
+  box-shadow:0 6px 20px rgba(46,204,113,0.45);
+  cursor:pointer;
+  background: linear-gradient(90deg, var(--cga-green-dark), var(--cga-green));
+  color:#fff;
+  font-weight:700;
+  transition:0.25s;
+}
+#secLoginBtn:hover { background: linear-gradient(90deg,#2ecc71,#27ae60); transform: translateY(-2px) scale(1.05); }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+  <img src="logo.png" class="cga-logo" alt="CGA Logo">
+
+  <div id="qrButtonsWrapper" style="display:flex; gap:8px; justify-content:center; align-items:center; background: rgba(255,255,255,0.05); padding:6px 8px; border-radius:12px; max-width:300px; margin:auto;">
+    <button id="startQR" class="choiceBtn active" style="font-size:14px; padding:6px 10px;">📷 QR Kodu Okut</button>
+    <button id="enterCode" class="choiceBtn" style="font-size:14px; padding:6px 10px;">⌨️ Kod Gir</button>
+  </div>
+
+  <div style="margin-top:10px; text-align:center;">
+    <div id="siteName" class="site-name" style="font-size:24px;"></div>
+    <div id="qrMessage" style="margin-top:4px; color:#f1c40f; font-size:14px;"></div>
+  </div>
+
+  <!-- Kod gir modal -->
+  <div id="codeModal" class="modal hidden">
+    <div class="modal-box" style="padding:20px; max-width:300px; text-align:center;">
+      <h3 style="margin-bottom:12px; color:#f1c40f;">Site Kodunu Gir</h3>
+      <input id="codeInput" type="text" maxlength="4" placeholder="0000" style="width:60%; padding:8px; border-radius:8px; border:none; text-align:center; font-size:16px;">
+      <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+        <button id="codeCancel" class="loginBtn" style="padding:6px 12px; font-size:14px;">İptal</button>
+        <button id="codeConfirm" class="loginBtn" style="padding:6px 12px; font-size:14px;">Onayla</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="qrModal" class="modal hidden">
+      <div class="modal-content">
+        <div id="qr-reader"></div>
+        <button id="closeQRModal" class="loginBtn">Kapat</button>
+      </div>
+    </div>
+
+  <div class="securityText" id="securityBtn">🔐 Güvenlik Girişi</div>
+
+  <div id="securityGroup" class="input-group active">
+    <input type="text" id="secUsername" placeholder="Kullanıcı Adı">
+    <input type="password" id="secPassword" placeholder="Şifre">
+    <div class="remember">
+      <input type="checkbox" id="secRemember">
+      <label for="secRemember">Kullanıcıyı hatırla</label>
+    </div>
+    <button class="loginBtn" id="secLoginBtn">Giriş Yap</button>
+  </div>
+
+  <div class="message" id="message"></div>
+</div>
+
+<div class="corner-bottom">© 2025 CGA Güvenlik Sistemleri</div>
+<div class="corner-top">v1.0.0</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+// MERKEZ FIREBASE
+const merkezConfig = {
+ apiKey: "AIzaSyAM5NHBpRHIlttNXwJ9YKDypR4eoyQbDeM",
+ authDomain: "kolartguvenlik-e002d.firebaseapp.com",
+ databaseURL: "https://kolartguvenlik-e002d-default-rtdb.firebaseio.com",
+ projectId: "kolartguvenlik-e002d",
+ storageBucket: "kolartguvenlik-e002d.firebasestorage.app",
+ messagingSenderId: "212955174898",
+ appId: "1:212955174898:web:f77501991c1648fb66bd6b",
+ measurementId: "G-TCGDNDYY6Y"
+};
+const merkezApp = getApps().find(a => a.name === "[DEFAULT]") || initializeApp(merkezConfig);
+const merkezDB = getDatabase(merkezApp);
+
+// DOM
+const siteNameEl = document.getElementById("siteName");
+const securityBtn = document.getElementById("securityBtn");
+const securityGroup = document.getElementById("securityGroup");
+const msg = document.getElementById("message");
+const secUsername = document.getElementById("secUsername");
+const secPassword = document.getElementById("secPassword");
+const secRemember = document.getElementById("secRemember");
+
+const qrBtn = document.getElementById("startQR");
+const codeBtn = document.getElementById("enterCode");
+const codeModal = document.getElementById("codeModal");
+const codeInput = document.getElementById("codeInput");
+const codeCancel = document.getElementById("codeCancel");
+const codeConfirm = document.getElementById("codeConfirm");
+const qrModal = document.getElementById("qrModal");
+const closeQRModal = document.getElementById("closeQRModal");
+let qrReader = null;
+
+const modal = document.getElementById("disconnectModal");
+const cancelBtn = document.getElementById("cancelDisconnect");
+const confirmBtn = document.getElementById("confirmDisconnect");
+
+// 💡 Yeni fonksiyonlar
+// 💡 Yeni fonksiyonlar
+function hideQRButtons(){
+  qrBtn.style.display="none";
+  codeBtn.style.display="none";
+  document.getElementById("qrButtonsWrapper").style.display = "none"; // 🌟 wrapper da kayboluyor
+}
+
+function showQRButtons(){
+  qrBtn.style.display="flex";
+  codeBtn.style.display="flex";
+  document.getElementById("qrButtonsWrapper").style.display = "flex"; // 🌟 wrapper geri geliyor
+}
+
+
+// sayfa yüklendiğinde
+window.addEventListener("load", async ()=>{
+  securityBtn.click();
+  const secStored = JSON.parse(localStorage.getItem("securityUser"));
+  if(secStored){ 
+    secUsername.value = secStored.username; 
+    secPassword.value = secStored.password; 
+    secRemember.checked = true; 
+  }
+
+[secUsername, secPassword].forEach(el => {
+  // IME (Türkçe karakter vs.) için
+  el.addEventListener("compositionstart", () => el.isComposing = true);
+  el.addEventListener("compositionend", () => el.isComposing = false);
+
+  // kullanıcı inputtan çıkınca büyük harfe çevir
+  el.addEventListener("blur", () => {
+    el.value = el.value.toLocaleUpperCase('tr-TR');
+  });
+
+  // istersen yazarken de canlı büyük yapabilirsin
+  el.addEventListener("input", () => {
+    if(!el.isComposing) { 
+      el.value = el.value.toLocaleUpperCase('tr-TR'); 
+    }
+  });
+});
+
+
+  const savedSiteID = localStorage.getItem("siteID");
+  const savedConfig = localStorage.getItem("siteConfig");
+  if(savedSiteID && savedConfig){
+    const siteConfig = JSON.parse(savedConfig);
+    let siteApp = getApps().find(a=>a.name==`siteApp-${savedSiteID}`);
+    if(!siteApp) siteApp = initializeApp(siteConfig, `siteApp-${savedSiteID}`);
+    const siteDB = getDatabase(siteApp);
+    hideQRButtons();
+    await loadSiteName(siteDB);
+  }
+});
+
+// LOGIN
+async function loginUser(username,password,role){
+  username=username.trim(); password=password.trim(); msg.textContent="";
+  const siteConfig = localStorage.getItem("siteConfig") ? JSON.parse(localStorage.getItem("siteConfig")) : null;
+  if(!siteConfig){ msg.textContent="Lütfen QR kodu okutunuz!"; return; }
+  if(!username||!password){ msg.textContent="Kullanıcı adı ve şifre gerekli!"; return; }
+
+  try{
+    const siteId = localStorage.getItem("siteID");
+    let app = getApps().find(a=>a.name==`siteApp-${siteId}`);
+    if(!app) app=initializeApp(siteConfig,`siteApp-${siteId}`);
+    const activeDB = getDatabase(app);
+
+    const adminSnap = await get(child(ref(activeDB),'admin'));
+    if(adminSnap.exists()){
+      const adminUser = adminSnap.val();
+      if(username===adminUser.username && password===adminUser.password){
+        sessionStorage.setItem("currentUser", JSON.stringify({username,type:"admin"}));
+        window.location.href="mod.html"; return;
+      }
+    }
+
+    const userSnap = await get(child(ref(activeDB),'users/'+username));
+    if(!userSnap.exists()){ msg.textContent="Kullanıcı bulunamadı!"; return; }
+    const user=userSnap.val();
+    if(user.password!==password){ msg.textContent="Şifre hatalı!"; return; }
+
+    sessionStorage.setItem("currentUser", JSON.stringify({username:user.username,type:user.type}));
+    if(role==="security"){
+      if(secRemember.checked) localStorage.setItem("securityUser",JSON.stringify({username,password}));
+      else localStorage.removeItem("securityUser");
+
+      if(user.type==="company") window.location.href="sirket.html";
+      else if(user.type==="security") window.location.href="guvenlik.html";
+      else if(user.type==="admin") window.location.href="yetkili.html";
+      else msg.textContent="Yetki hatalı!";
+    }
+
+  }catch(err){ console.error(err); msg.textContent="Bağlantı hatası!"; }
+}
+
+document.getElementById("secLoginBtn").addEventListener("click", ()=> loginUser(secUsername.value, secPassword.value,"security"));
+
+// SITE ADI
+async function loadSiteName(db){
+  try{
+    const snap = await get(child(ref(db),"settings/siteName"));
+    if(snap.exists()){
+      const name=snap.val().trim();
+      if(name!==""){ siteNameEl.textContent=name; siteNameEl.style.display="block"; }
+    }
+  }catch(e){ console.error("Site adı yüklenemedi", e); }
+}
+
+// QR Başlat
+qrBtn.addEventListener("click", ()=>{
+  setActive(qrBtn);
+  qrModal.style.display = "flex";
+  const qrDiv = document.getElementById("qr-reader");
+  qrDiv.innerHTML = "";
+  qrReader = new Html5Qrcode("qr-reader");
+  const qrBoxSize = Math.min(window.innerWidth*0.8,300);
+  qrReader.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: qrBoxSize },
+    async (qrCodeMessage)=>{
+      try{ await qrReader.stop(); }catch(e){}
+      qrReader=null;
+      qrModal.style.display = "none";
+      await loadSiteConfig(qrCodeMessage);
+      document.getElementById("qrMessage").textContent="İşlem başarılı, şimdi giriş yapabilirsiniz.";
+    },
+    (err)=>{ console.log("QR tarama:",err);}
+  ).catch(err=>{
+    alert("Kamera açılamadı: "+err);
+    qrModal.style.display = "none";
+  });
+});
+
+// Kod Gir buton
+codeBtn.addEventListener("click", ()=>{
+  setActive(codeBtn);
+  codeModal.classList.remove("hidden");
+  codeInput.value="";
+  codeInput.focus();
+});
+
+// Kod Modal
+codeCancel.addEventListener("click", ()=> codeModal.classList.add("hidden"));
+codeConfirm.addEventListener("click", async ()=>{
+  const code = codeInput.value.trim();
+  if(!/^\d{4}$/.test(code)){ alert("Lütfen 4 haneli sayı girin!"); return; }
+  codeModal.classList.add("hidden");
+  await loadSiteConfig(code);
+  document.getElementById("qrMessage").textContent="Kod başarıyla yüklendi, giriş yapabilirsiniz!";
+});
+
+// Disconnect Modal
+siteNameEl.addEventListener("mousedown",()=>{ pressTimer=setTimeout(openDisconnectModal,800); });
+siteNameEl.addEventListener("mouseup",()=>clearTimeout(pressTimer));
+siteNameEl.addEventListener("mouseleave",()=>clearTimeout(pressTimer));
+siteNameEl.addEventListener("touchstart",()=>{ pressTimer=setTimeout(openDisconnectModal,800); });
+siteNameEl.addEventListener("touchend",()=>clearTimeout(pressTimer));
+
+function disconnectProject(){
+  localStorage.removeItem("siteID");
+  localStorage.removeItem("siteConfig");
+  sessionStorage.removeItem("currentUser");
+  siteNameEl.textContent="";
+  siteNameEl.style.display="none";
+  showQRButtons(); // 🔹 artık iki buton da geri geliyor
+  document.getElementById("qrMessage").textContent="Proje bağlantısından ayrıldınız.";
+  msg.textContent="";
+}
+
+function openDisconnectModal(){ modal.classList.remove("hidden"); }
+function closeDisconnectModal(){ modal.classList.add("hidden"); }
+cancelBtn.onclick = closeDisconnectModal;
+confirmBtn.onclick = ()=>{ closeDisconnectModal(); disconnectProject(); };
+
+// Aktif buton görseli
+function setActive(button){ [qrBtn, codeBtn].forEach(b=>b.classList.remove("active")); button.classList.add("active"); }
+
+// SITE CONFIG
+async function loadSiteConfig(inputCode){
+  try{
+    let siteID;
+
+    // inputCode 4 haneli sayı mı?
+    if(/^\d{4}$/.test(inputCode)){
+      // 4 haneli kod -> shortCodes'dan al
+      const shortSnap = await get(child(ref(merkezDB), `shortCodes/${inputCode}`));
+      if(!shortSnap.exists()){
+        msg.textContent = "Kısa kod geçersiz!";
+        showQRButtons();
+        return null;
+      }
+      siteID = shortSnap.val();
+    } else {
+      // QR kod ile gelen uzun ID -> direk kullan
+      siteID = inputCode;
+    }
+
+    // sites/<siteID>/config al
+    const siteSnap = await get(child(ref(merkezDB), `sites/${siteID}/config`));
+    if(!siteSnap.exists()){
+      msg.textContent = "Site config bulunamadı!";
+      showQRButtons();
+      return null;
+    }
+
+    const siteConfig = siteSnap.val();
+
+    // App oluştur / kullan
+    let siteApp = getApps().find(a => a.name === `siteApp-${siteID}`);
+    if(!siteApp) siteApp = initializeApp(siteConfig, `siteApp-${siteID}`);
+
+    const siteDB = getDatabase(siteApp);
+
+    // localStorage ve buton işlemleri
+    localStorage.setItem("siteID", siteID);
+    localStorage.setItem("siteConfig", JSON.stringify(siteConfig));
+    hideQRButtons(); // butonları gizle
+    await loadSiteName(siteDB);
+
+    msg.textContent = "Site başarıyla yüklendi!";
+    return siteDB;
+
+  } catch(err){
+    console.error(err);
+    msg.textContent = "Site yüklenirken hata oluştu!";
+    showQRButtons();
+  }
+}
+// QR modal kapatma
+closeQRModal.addEventListener("click", async () => {
+  if(qrReader){
+    try {
+      await qrReader.stop(); // QR tarayıcıyı durdur
+      qrReader.clear();      // Temizle
+    } catch(e){
+      console.error("QR durdurulamadı:", e);
+    }
+    qrReader = null;
+  }
+  qrModal.style.display = "none"; // modalı gizle
+});
+
+</script>
+
+<!-- 🔒 DISCONNECT MODAL -->
+<div id="disconnectModal" class="disconnect-modal hidden">
+  <div class="modal-box">
+    <p>Proje bağlantısından ayrılmak istiyor musunuz?</p>
+    <div class="modal-actions">
+      <button id="cancelDisconnect">İptal</button>
+      <button id="confirmDisconnect">Ayrıl</button>
+    </div>
+  </div>
+</div>
+
+<!-- PWA Yükleme Butonu -->
+<button id="installBtn" class="install-btn" style="position: fixed; top: 12px; left: 12px; font-size: 20px; display:none; z-index:500;">📲 Uygulamayı Yükle</button>
+
+<script>
+let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'block';
+});
+
+installBtn.addEventListener('click', async () => {
+  installBtn.style.display = 'none';
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  }
+});
+
+// Service Worker kaydı
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('Service Worker kaydedildi.'))
+      .catch(err => console.error('Service Worker hatası:', err));
+  });
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log("Yeni sürüm algılandı, uygulama yenileniyor");
+    window.location.reload();
+  });
+}
+</script>
+
+</body>
+</html>
